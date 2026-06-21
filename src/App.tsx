@@ -456,21 +456,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="flex gap-2 mb-4">
-                    <button
-                      onClick={selectAllIngredients}
-                      className="flex-1 py-1 px-2 text-xs bg-stone-800 hover:bg-stone-750 text-stone-300 border border-stone-700 rounded transition cursor-pointer"
-                    >
-                      全選食材
-                    </button>
-                    <button
-                      onClick={clearAllIngredients}
-                      className="flex-1 py-1 px-2 text-xs bg-stone-800 hover:bg-stone-750 text-stone-300 border border-stone-700 rounded transition cursor-pointer"
-                    >
-                      清空所選
-                    </button>
-                  </div>
-
                   {/* Compact Grid of Category Block Tiles */}
                   <div className="grid grid-cols-7 gap-1 mt-2.5 mb-4" id="category-tiles-grid">
                     {groupedIngredients.map(([catKey, categoryData]) => {
@@ -590,8 +575,16 @@ export default function App() {
                   </div>
 
                   <div className="mt-4 pt-3 border-t border-stone-800 bg-stone-905 flex items-center justify-between text-xs text-stone-400">
-                    <span>已勾選食材庫：</span>
-                    <span className="font-mono text-amber-500 font-bold">{checkedIngredients.length} / {INGREDIENTS.length} 種</span>
+                    <span className="flex items-center gap-1.5">
+                      <span>已勾選食材庫：</span>
+                      <span className="font-mono text-amber-500 font-bold">{checkedIngredients.length} / {INGREDIENTS.length} 種</span>
+                    </span>
+                    <button
+                      onClick={clearAllIngredients}
+                      className="py-1 px-2.5 text-xs bg-stone-800 hover:bg-stone-750 text-stone-300 border border-stone-700 rounded-lg transition cursor-pointer font-medium"
+                    >
+                      清空所選
+                    </button>
                   </div>
                 </div>
               </div>
