@@ -611,33 +611,36 @@ export default function App() {
                             setSortBy("hp");
                             setSortDirection("desc");
                           }}
-                          className={`flex-1 py-1 text-[11px] font-medium rounded transition text-center cursor-pointer ${
+                          className={`flex-1 py-1 text-[11px] font-medium rounded transition cursor-pointer flex items-center justify-center gap-1 ${
                             sortBy === "hp" ? "bg-rose-950/40 text-rose-300 font-bold" : "text-stone-400 hover:text-stone-200"
                           }`}
                         >
-                          生命值❤️
+                          <StateIcon type="hp" className="w-3.5 h-3.5 object-contain shrink-0" />
+                          <span>+血量</span>
                         </button>
                         <button
                           onClick={() => {
                             setSortBy("hunger");
                             setSortDirection("desc");
                           }}
-                          className={`flex-1 py-1 text-[11px] font-medium rounded transition text-center cursor-pointer ${
+                          className={`flex-1 py-1 text-[11px] font-medium rounded transition cursor-pointer flex items-center justify-center gap-1 ${
                             sortBy === "hunger" ? "bg-amber-950/40 text-amber-300 font-bold" : "text-stone-400 hover:text-stone-200"
                           }`}
                         >
-                          飢餓值🍖
+                          <StateIcon type="hunger" className="w-3.5 h-3.5 object-contain shrink-0" />
+                          <span>+飢餓值</span>
                         </button>
                         <button
                           onClick={() => {
                             setSortBy("sanity");
                             setSortDirection("desc");
                           }}
-                          className={`flex-1 py-1 text-[11px] font-medium rounded transition text-center cursor-pointer ${
+                          className={`flex-1 py-1 text-[11px] font-medium rounded transition cursor-pointer flex items-center justify-center gap-1 ${
                             sortBy === "sanity" ? "bg-sky-950/40 text-sky-300 font-bold" : "text-stone-400 hover:text-stone-200"
                           }`}
                         >
-                          精神值🌀
+                          <StateIcon type="sanity" className="w-3.5 h-3.5 object-contain shrink-0" />
+                          <span>+san值</span>
                         </button>
                       </div>
                     </div>
