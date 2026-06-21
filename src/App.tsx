@@ -339,6 +339,42 @@ export default function App() {
       }
     });
 
+    const getBaseId = (id: string) => {
+      return id
+        .replace(/_cooked$/, "")
+        .replace(/^cooked_/, "")
+        .replace(/_dried$/, "")
+        .replace(/^dried_/, "")
+        .replace(/_ripe$/, "")
+        .replace(/^ripe_/, "");
+    };
+
+    const getVariantPriority = (id: string) => {
+      if (id.endsWith("_cooked") || id.startsWith("cooked_")) return 1;
+      if (id.endsWith("_dried") || id.startsWith("dried_")) return 2;
+      return 0; // Raw
+    };
+
+    // Sort lists to place similar food variants (e.g. raw, cooked, dried) next to each other
+    Object.values(groups).forEach((group) => {
+      const baseIdFirstIndex: Record<string, number> = {};
+      group.list.forEach((ing, index) => {
+        const bId = getBaseId(ing.id);
+        if (baseIdFirstIndex[bId] === undefined) {
+          baseIdFirstIndex[bId] = index;
+        }
+      });
+
+      group.list.sort((a, b) => {
+        const aBase = getBaseId(a.id);
+        const bBase = getBaseId(b.id);
+        if (aBase !== bBase) {
+          return baseIdFirstIndex[aBase] - baseIdFirstIndex[bBase];
+        }
+        return getVariantPriority(a.id) - getVariantPriority(b.id);
+      });
+    });
+
     return Object.entries(groups).filter(([_, data]) => data.list.length > 0);
   }, []);
 
