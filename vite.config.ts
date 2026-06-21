@@ -5,6 +5,7 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    base: process.env.GITHUB_ACTIONS ? '/Don-t_Starve_Together_Recipe/' : '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

@@ -1,322 +1,642 @@
-export interface Ingredient {
-  id: string;
-  name: string;
-  englishName: string;
-  category: string; // "meat" | "veg" | "fruit" | "egg" | "sweetener" | "dairy" | "filler" | "special"
-  values: {
-    meat?: number;
-    monster?: number;
-    veg?: number;
-    fruit?: number;
-    egg?: number;
-    sweetener?: number;
-    dairy?: number;
-    fish?: number;
-    twigs?: number;
-    ice?: number;
-    drumstick?: number;
-    butterfly?: number;
-    mandrake?: number;
-    birchnut?: number;
-    watermelon?: number;
-    dragonfruit?: number;
-    flower?: number;
-    mole?: number;
-    lichen?: number;
-    eel?: number;
+import { Ingredient, Recipe } from "./data/types";
+import { INGREDIENTS, INGREDIENT_MAP } from "./data/ingredients";
+import { cookingRecipes } from "./data/recipes";
+import { RECIPES as existingRecipes } from "./data/recipes_old";
+
+export type { Ingredient, Recipe };
+export { INGREDIENTS, INGREDIENT_MAP };
+
+// Map from new ID to old ID for the 23 original recipes
+const newToOldIdMap: Record<string, string> = {
+  "mandrakesoup": "mandrake_soup",
+  "waffles": "waffles",
+  "surfnturf": "surf_n_turf",
+  "icecream": "ice_cream",
+  "perogies": "pierogi",
+  "dragonpie": "dragonpie",
+  "fishsticks": "fishsticks",
+  "flowersalad": "flower_salad",
+  "trailmix": "trail_mix",
+  "unagi": "unagi",
+  "guacamole": "guacamole",
+  "butterflymuffin": "butter_muffin",
+  "turkeydinner": "turkey_dinner",
+  "baconeggs": "bacon_and_eggs",
+  "watermelonicle": "melonsicle",
+  "taffy": "taffy",
+  "bonestew": "meaty_stew",
+  "meatballs": "meatballs",
+  "jammypreserves": "fist_full_of_jam",
+  "ratatouille": "ratatouille",
+  "kabobs": "kabobs",
+  "monsterlasagna": "monster_lagasna", // map monsterlasagna to monster_lasagna (typo correction in map)
+  "wetgoop": "wet_goop"
+};
+
+// Handle typo in newToOldIdMap
+newToOldIdMap["monsterlasagna"] = "monster_lasagna";
+
+const recipeNameTranslations: Record<string, string> = {
+  "Amberosia": "琥珀凝凍",
+  "Asparagazpacho": "蘆筍冷湯",
+  "Asparagus Soup": "蘆筍湯",
+  "Bacon and Eggs": "培根蛋",
+  "Banana Pop": "香蕉冰棒",
+  "Banana Shake": "香蕉奶昔",
+  "Barnacle Linguine": "藤壺義大利麵",
+  "Barnacle Nigiri": "藤壺握壽司",
+  "Barnacle Pita": "藤壺口袋餅",
+  "Beefalo Treats": "牛隻零食",
+  "Beefy Greens": "大肉沙拉",
+  "Bird Egg": "熟蛋",
+  "Bone Bouillon": "骨頭湯",
+  "Braised Eggplant": "烤茄子",
+  "Breakfast Skillet": "早餐煎鍋",
+  "Bunny Stew": "兔肉湯",
+  "Butter Muffin": "蝴蝶鬆餅",
+  "California Roll": "加州卷",
+  "Ceviche": "檸汁醃魚",
+  "Cooked Asparagus": "烤蘆筍",
+  "Cooked Barnacle": "熟藤壺",
+  "Cooked Batilisk Wing": "熟蝙蝠翅膀",
+  "Cooked Blue Cap": "烤藍蘑菇",
+  "Cooked Cactus Flesh": "烤仙人掌肉",
+  "Cooked Eel": "熟鰻魚",
+  "Cooked Egg": "煎蛋",
+  "Cooked Fish": "熟魚肉",
+  "Cooked Frog Legs": "熟蛙腿",
+  "Cooked Green Cap": "烤綠蘑菇",
+  "Cooked Leafy Meat": "熟葉肉",
+  "Cooked Meat": "熟大肉",
+  "Cooked Monster Meat": "熟怪物肉",
+  "Cooked Moon Shroom": "烤月亮蘑菇",
+  "Cooked Red Cap": "烤紅蘑菇",
+  "Cooked Small Fish": "熟小魚肉",
+  "Cooked Small Meat": "熟小肉",
+  "Creamy Potato Purée": "大蒜土豆泥",
+  "Dark Petal Tea": "暗黑花瓣茶",
+  "Dragonpie": "火龍果派",
+  "Dried Kelp Fronds": "乾海帶",
+  "Dried Kelp Fronds (Dried Kelp)": "乾海帶",
+  "Fancy Spiralled Tubers": "扭扭薯塔",
+  "Fig-Stuffed Trunk": "無花果釀象鼻",
+  "Figatoni": "無花果義大利麵",
+  "Figgy Frogwich": "無花果蛙腿三明治",
+  "Figkabab": "無花果串燒",
+  "Fire Nettle Tea": "蕁麻茶",
+  "Fish Cordon Bleu": "藍帶魚排",
+  "Fish Morsel": "魚乾",
+  "Fish Tacos": "魚肉塔可",
+  "Fishsticks": "魚條",
+  "Fist Full of Jam": "果醬蜜餞",
+  "Flower Salad": "鮮花沙拉",
+  "Foliage Tea": "樹葉茶",
+  "Forget-Me-Lots Tea": "勿忘我茶",
+  "Fresh Fruit Crepes": "鮮果可麗餅",
+  "Fried Drumstick": "熟火雞腿",
+  "Froggle Bunwich": "蛙腿三明治",
+  "Frozen Banana Daiquiri": "冰鎮香蕉凍代基里",
+  "Fruit Medley": "水果拼盤",
+  "Glow Berry Mousse": "發光漿果慕斯",
+  "Grim Galette": "黯黑法式薄餅",
+  "Guacamole": "酪梨沙拉",
+  "Honey Ham": "蜜汁火腿",
+  "Honey Nuggets": "蜜汁金塊",
+  "Hot Dragon Chili Salad": "辣龍椒沙拉",
+  "Hot Pumpkin": "烤南瓜",
+  "Ice Cream": "冰淇淋",
+  "Jelly Salad": "果凍沙拉",
+  "Jellybeans": "糖豆",
+  "Jerky": "大肉乾",
+  "Kabobs": "肉串",
+  "Leafy Meatloaf": "葉肉卷",
+  "Lobster Bisque": "龍蝦濃湯",
+  "Lobster Dinner": "龍蝦大餐",
+  "Lune Tree Blossom Tea": "月亮樹花茶",
+  "Mandrake Soup": "曼德拉草湯",
+  "Meatballs": "肉丸",
+  "Meaty Stew": "肉湯",
+  "Melonsicle": "西瓜冰棒",
+  "Milkmade Hat": "乳製品帽",
+  "Monster Jerky": "怪物肉乾",
+  "Monster Lasagna": "怪物千層麵",
+  "Monster Tartare": "怪物韃靼",
+  "Moqueca": "海鮮燉菜",
+  "Mushy Cake": "苔蘚蛋糕",
+  "Petal Tea": "花瓣茶",
+  "Pierogi": "波蘭餃子",
+  "Plain Omelette": "純煎蛋",
+  "Popcorn": "爆米花",
+  "Powdercake": "芝士蛋糕",
+  "Prepared Dragon Fruit": "烤火龍果",
+  "Pumpkin Cookies": "南瓜餅乾",
+  "Ratatouille": "蔬菜雜燴",
+  "Roasted Berries": "烤漿果",
+  "Roasted Carrot": "烤胡蘿蔔",
+  "Roasted Garlic": "烤大蒜",
+  "Roasted Onion": "烤洋蔥",
+  "Roasted Pepper": "烤辣椒",
+  "Roasted Potato": "烤土豆",
+  "Roasted Tomato": "烤番茄",
+  "Salsa Fresca": "莎莎醬",
+  "Seafood Gumbo": "海鮮濃湯",
+  "Sliced Pomegranate": "烤石榴",
+  "Small Fish Morsel": "小魚乾",
+  "Small Jerky": "小肉乾",
+  "Soothing Tea": "舒緩茶",
+  "Spicy Chili": "辣辣椒",
+  "Steamed Twigs": "蒸樹枝",
+  "Stuffed Eggplant": "釀茄子",
+  "Stuffed Fish Heads": "藤壺釀魚頭",
+  "Stuffed Night Cap": "釀毒蘑菇",
+  "Stuffed Pepper Poppers": "釀辣椒",
+  "Succulent Tea": "多肉植物茶",
+  "Surf 'n' Turf": "海陸雙拼",
+  "Taffy": "太妃糖",
+  "Tall Scotch Eggs": "蘇格蘭高鳥蛋",
+  "Tillweed Tea": "犁地草茶",
+  "Toasted Seeds": "烤種子",
+  "Trail Mix": "綜合堅果",
+  "Turkey Dinner": "火雞大餐",
+  "Unagi": "鰻魚料理",
+  "Vegetable Stinger": "蔬菜刺針",
+  "Veggie Burger": "蔬菜漢堡",
+  "Volt Goat Chaud-Froid": "伏特羊熱凍",
+  "Waffles": "鬆餅",
+  "Wet Goop": "濕滑焦糊",
+};
+
+function mapCategoryToTag(name: string): string {
+  name = name.toLowerCase().trim();
+  if (name === "veggie") return "veg";
+  if (name === "inedible") return "twigs";
+  if (name === "frozen") return "ice";
+  return name;
+}
+
+function mapNameToId(name: string): string {
+  name = name.toLowerCase().trim();
+  const nameToIdMap: Record<string, string> = {
+    "asparagus": "asparagus",
+    "cave banana": "cave_banana",
+    "barnacle": "barnacle",
+    "butter": "butter",
+    "egg": "bird_egg",
+    "royal jelly": "royal_jelly",
+    "forget-me-lots": "forgetmelots",
+    "small meat": "smallmeat",
+    "dragon fruit": "dragonfruit",
+    "fig": "fig",
+    "twigs": "twigs",
+    "cactus flower": "cactus_flower",
+    "frog legs": "froglegs",
+    "moleworm": "mole",
+    "meat": "meat",
+    "onion": "onion",
+    "ripe stone fruit": "rock_avocado_fruit_ripe",
+    "cactus flesh": "cactus_meat",
+    "fish": "fishmeat",
+    "kelp": "kelp",
+    "acorn": "acorn_cooked",
+    "sweetener": "honey",
+    "drumstick": "drumstick",
+    "seed": "seeds",
+    "seeds": "seeds",
+    "butterfly wings": "butterflywings",
+    "koalefant trunk": "trunk_summer",
+    "leafy meat": "plantmeat",
+    "wobster": "wobster_sheller_land",
+    "moon shroom": "moon_cap",
+    "red cap": "red_cap",
+    "blue cap": "blue_cap",
+    "green cap": "green_cap",
+    "monster meat": "monstermeat",
+    "tallbird egg": "tallbirdegg",
+    "lichen": "cutlichen",
+    "bone shards": "boneshard",
+    "nightmare fuel": "nightmarefuel",
+    "volt goat horn": "lightninggoathorn",
+    "collected dust": "refined_dust",
+    "glow berry": "wormlight",
+    "lesser glow berry": "wormlight_lesser",
+    "fruit": "berries",
+    "veggie": "carrot"
   };
-  color: string; // for UI tag illustration
-  avatarText: string; // short Emoji or text
+  return nameToIdMap[name] || name;
 }
 
-export interface Recipe {
-  id: string;
-  name: string;
-  englishName: string;
-  hp: number;
-  hunger: number;
-  sanity: number;
-  cookTime: number; // in seconds
-  perishDays: number; // rot time
-  priority: number;
-  requirementsZH: string;
-  requirementsEN: string;
-  canCookWith: (totals: Record<string, number>, ingredients: Ingredient[]) => boolean;
-  idealCombo: string[]; // exemplary recipe combo IDs e.g. ["monster_meat", "berries", "berries", "berries"]
-  description: string;
-}
 
-// 1. Ingredients List
-export const INGREDIENTS: Ingredient[] = [
-  {
-    id: "large_meat",
-    name: "大肉",
-    englishName: "Meat",
-    category: "meat",
-    values: { meat: 1.0 },
-    color: "bg-red-600 hover:bg-red-700 text-white border-red-800",
-    avatarText: "🥩",
-  },
-  {
-    id: "morsel",
-    name: "小肉",
-    englishName: "Morsel",
-    category: "meat",
-    values: { meat: 0.5 },
-    color: "bg-orange-600 hover:bg-orange-700 text-white border-orange-800",
-    avatarText: "🍖",
-  },
-  {
-    id: "monster_meat",
-    name: "怪物肉",
-    englishName: "Monster Meat",
-    category: "meat",
-    values: { meat: 1.0, monster: 1.0 },
-    color: "bg-purple-700 hover:bg-purple-800 text-white border-purple-950",
-    avatarText: "👾",
-  },
-  {
-    id: "drumstick",
-    name: "火雞腿",
-    englishName: "Drumstick",
-    category: "meat",
-    values: { meat: 0.5, drumstick: 1.0 },
-    color: "bg-amber-600 hover:bg-amber-700 text-white border-amber-800",
-    avatarText: "🍗",
-  },
-  {
-    id: "frog_legs",
-    name: "蛙腿",
-    englishName: "Frog Legs",
-    category: "meat",
-    values: { meat: 0.5 },
-    color: "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-800",
-    avatarText: "🐸",
-  },
-  {
-    id: "fish",
-    name: "魚肉",
-    englishName: "Fish",
-    category: "meat",
-    values: { meat: 0.5, fish: 1.0 },
-    color: "bg-blue-600 hover:bg-blue-700 text-white border-blue-800",
-    avatarText: "🐟",
-  },
-  {
-    id: "eel",
-    name: "鰻魚",
-    englishName: "Eel",
-    category: "meat",
-    values: { meat: 1.0, fish: 1.0, eel: 1.0 },
-    color: "bg-slate-700 hover:bg-slate-800 text-white border-slate-900",
-    avatarText: "🐉",
-  },
-  {
-    id: "carrot",
-    name: "胡蘿蔔",
-    englishName: "Carrot",
-    category: "veg",
-    values: { veg: 1.0 },
-    color: "bg-orange-400 hover:bg-orange-500 text-stone-900 border-orange-600",
-    avatarText: "🥕",
-  },
-  {
-    id: "mushroom",
-    name: "蕈類",
-    englishName: "Mushroom",
-    category: "veg",
-    values: { veg: 0.5 },
-    color: "bg-teal-600 hover:bg-teal-700 text-white border-teal-800",
-    avatarText: "🍄",
-  },
-  {
-    id: "pumpkin",
-    name: "南瓜",
-    englishName: "Pumpkin",
-    category: "veg",
-    values: { veg: 1.0 },
-    color: "bg-amber-500 hover:bg-amber-600 text-stone-950 border-amber-700",
-    avatarText: "🎃",
-  },
-  {
-    id: "eggplant",
-    name: "茄子",
-    englishName: "Eggplant",
-    category: "veg",
-    values: { veg: 1.0 },
-    color: "bg-violet-800 hover:bg-violet-900 text-white border-violet-950",
-    avatarText: "🍆",
-  },
-  {
-    id: "cactus_flesh",
-    name: "仙人掌肉",
-    englishName: "Cactus Flesh",
-    category: "veg",
-    values: { veg: 1.0 },
-    color: "bg-emerald-700 hover:bg-emerald-800 text-white border-emerald-900",
-    avatarText: "🌵",
-  },
-  {
-    id: "lichen",
-    name: "洞穴苔蘚",
-    englishName: "Lichen",
-    category: "veg",
-    values: { veg: 1.0, lichen: 1.0 },
-    color: "bg-green-800 hover:bg-green-900 text-white border-green-950",
-    avatarText: "🌿",
-  },
-  {
-    id: "berries",
-    name: "漿果",
-    englishName: "Berries",
-    category: "fruit",
-    values: { fruit: 0.5 },
-    color: "bg-rose-600 hover:bg-rose-700 text-white border-rose-800",
-    avatarText: "🍒",
-  },
-  {
-    id: "dragonfruit",
-    name: "火龍果",
-    englishName: "Dragon Fruit",
-    category: "fruit",
-    values: { fruit: 1.0, dragonfruit: 1.0 },
-    color: "bg-pink-600 hover:bg-pink-700 text-white border-pink-800",
-    avatarText: "🐉",
-  },
-  {
-    id: "watermelon",
-    name: "西瓜",
-    englishName: "Watermelon",
-    category: "fruit",
-    values: { fruit: 1.0, watermelon: 1.0 },
-    color: "bg-emerald-500 hover:bg-emerald-600 text-stone-900 border-emerald-700",
-    avatarText: "🍉",
-  },
-  {
-    id: "durian",
-    name: "榴槤",
-    englishName: "Durian",
-    category: "fruit",
-    values: { fruit: 1.0, monster: 1.0 },
-    color: "bg-yellow-700 hover:bg-yellow-800 text-white border-yellow-900",
-    avatarText: "🍈",
-  },
-  {
-    id: "egg",
-    name: "雞蛋",
-    englishName: "Egg",
-    category: "egg",
-    values: { egg: 1.0 },
-    color: "bg-yellow-50 hover:bg-yellow-100 text-stone-900 border-yellow-300",
-    avatarText: "🥚",
-  },
-  {
-    id: "tallbird_egg",
-    name: "高鳥蛋",
-    englishName: "Tallbird Egg",
-    category: "egg",
-    values: { egg: 4.0 },
-    color: "bg-yellow-200 hover:bg-yellow-300 text-stone-900 border-yellow-400",
-    avatarText: "🪺",
-  },
-  {
-    id: "honey",
-    name: "蜂蜜",
-    englishName: "Honey",
-    category: "sweetener",
-    values: { sweetener: 1.0 },
-    color: "bg-yellow-400 hover:bg-yellow-500 text-stone-950 border-yellow-600",
-    avatarText: "🍯",
-  },
-  {
-    id: "butter",
-    name: "黃油",
-    englishName: "Butter",
-    category: "dairy",
-    values: { dairy: 1.0 },
-    color: "bg-yellow-100 hover:bg-yellow-200 text-stone-900 border-yellow-400",
-    avatarText: "🧈",
-  },
-  {
-    id: "electric_milk",
-    name: "羊奶",
-    englishName: "Electric Milk",
-    category: "dairy",
-    values: { dairy: 1.0 },
-    color: "bg-sky-100 hover:bg-sky-200 text-stone-900 border-sky-300",
-    avatarText: "🥛",
-  },
-  {
-    id: "twigs",
-    name: "樹枝",
-    englishName: "Twigs",
-    category: "filler",
-    values: { twigs: 1.0 },
-    color: "bg-amber-800 hover:bg-amber-900 text-white border-amber-950",
-    avatarText: "🥢",
-  },
-  {
-    id: "ice",
-    name: "冰塊",
-    englishName: "Ice",
-    category: "filler",
-    values: { ice: 1.0 },
-    color: "bg-sky-300 hover:bg-sky-450 text-stone-900 border-sky-400",
-    avatarText: "🧊",
-  },
-  {
-    id: "butterfly_wings",
-    name: "蝴蝶翅膀",
-    englishName: "Butterfly Wings",
-    category: "special",
-    values: { butterfly: 1.0 },
-    color: "bg-pink-400 hover:bg-pink-500 text-white border-pink-600",
-    avatarText: "🦋",
-  },
-  {
-    id: "mandrake",
-    name: "曼德拉草",
-    englishName: "Mandrake",
-    category: "special",
-    values: { mandrake: 1.0 },
-    color: "bg-lime-500 hover:bg-lime-600 text-stone-950 border-lime-700",
-    avatarText: "🌱",
-  },
-  {
-    id: "roasted_birchnut",
-    name: "烤樺木果",
-    englishName: "Roasted Birchnut",
-    category: "special",
-    values: { birchnut: 1.0 },
-    color: "bg-amber-700 hover:bg-amber-800 text-white border-amber-900",
-    avatarText: "🌰",
-  },
-  {
-    id: "cactus_flower",
-    name: "仙人掌花",
-    englishName: "Cactus Flower",
-    category: "special",
-    values: { flower: 1.0 },
-    color: "bg-pink-300 hover:bg-pink-400 text-stone-900 border-pink-500",
-    avatarText: "🌸",
-  },
-  {
-    id: "mole",
-    name: "鼴鼠",
-    englishName: "Mole",
-    category: "special",
-    values: { mole: 1.0, meat: 0.5 },
-    color: "bg-stone-500 hover:bg-stone-600 text-white border-stone-700",
-    avatarText: "🐹",
+function parseRequirements(reqStr: string) {
+  if (reqStr.includes("Anything")) {
+    return () => true;
   }
-];
 
-export const INGREDIENT_MAP = INGREDIENTS.reduce((acc, curr) => {
-  acc[curr.id] = curr;
-  return acc;
-}, {} as Record<string, Ingredient>);
+  const parts = reqStr.split(",").map(s => s.trim());
+  const checks: ((t: Record<string, number>, ings: Ingredient[]) => boolean)[] = [];
 
-// Helper helper function to sum up parameters
+  for (const part of parts) {
+    if (part.toLowerCase().includes("glow berry") && part.toLowerCase().includes("lesser")) {
+      checks.push((t, ings) => {
+        const glowBerryCount = ings.filter(i => i.id === "wormlight").length;
+        const lesserGlowBerryCount = ings.filter(i => i.id === "wormlight_lesser").length;
+        return glowBerryCount >= 1 || lesserGlowBerryCount >= 2;
+      });
+      continue;
+    }
+    if (part.startsWith("No ")) {
+      const category = part.replace("No ", "").toLowerCase();
+      const tag = mapCategoryToTag(category);
+      checks.push((t) => (t[tag] || 0) === 0);
+    } else if (part.includes("×")) {
+      const match = part.match(/(.+) ×([\d.]+)/);
+      if (match) {
+        const namePart = match[1].trim().toLowerCase();
+        const count = parseFloat(match[2]);
+        const tag = mapCategoryToTag(namePart);
+        const categoriesList = ["meat", "veg", "fruit", "egg", "sweetener", "dairy", "fish", "twigs", "ice"];
+        if (categoriesList.includes(tag)) {
+          checks.push((t) => (t[tag] || 0) >= count);
+        } else {
+          const subNames = namePart.split("/").map(n => n.trim());
+          const subIds = subNames.map(mapNameToId);
+          checks.push((t, ings) => {
+            const matchedIngs = ings.filter(i => subIds.includes(i.id));
+            return matchedIngs.length >= count;
+          });
+        }
+      }
+    } else if (part.includes(">") || part.includes("<") || part.includes("≥") || part.includes("≤") || part.includes("=")) {
+      const match = part.match(/(.+?)\s*([><≥≤=]|>=|<=)\s*([\d.]+)/);
+      if (match) {
+        const category = match[1].trim().toLowerCase();
+        const op = match[2];
+        const val = parseFloat(match[3]);
+        const tag = mapCategoryToTag(category);
+        checks.push((t) => {
+          const currentVal = t[tag] || 0;
+          const minVal = (tag === "meat" && (op === "≤" || op === "<=" || op === "<")) ? 0.25 : 0;
+          if (op === ">") return currentVal > val;
+          if (op === "<") return currentVal < val && currentVal >= minVal;
+          if (op === "≥" || op === ">=") return currentVal >= val;
+          if (op === "≤" || op === "<=") return currentVal <= val && currentVal >= minVal;
+          if (op === "=") return currentVal === val;
+          return false;
+        });
+      }
+    } else {
+      const name = part.toLowerCase().trim();
+      const tag = mapCategoryToTag(name);
+      if (tag === "meat" || tag === "veg" || tag === "fruit" || tag === "egg" || tag === "sweetener" || tag === "dairy" || tag === "fish" || tag === "twigs" || tag === "ice") {
+        checks.push((t) => (t[tag] || 0) >= 0.5);
+      } else {
+        const ingId = mapNameToId(name);
+        checks.push((t, ings) => ings.some(i => i.id === ingId));
+      }
+    }
+  }
+
+  return (t: Record<string, number>, ings: Ingredient[]) => {
+    return checks.every(c => c(t, ings));
+  };
+}
+
+const INGREDIENT_COSTS: Record<string, number> = {
+  "twigs": 1,
+  "ice": 2,
+  "berries": 5,
+  "berries_juicy": 6,
+  "carrot": 10,
+  "red_mushroom": 12,
+  "green_mushroom": 12,
+  "blue_mushroom": 12,
+  "smallmeat": 20,
+  "monstermeat": 25,
+  "bird_egg": 30,
+  "honey": 35,
+  "froglegs": 40,
+  "drumstick": 45,
+  "fish": 50,
+  "meat": 60,
+  "potato": 30,
+  "onion": 35,
+  "garlic": 40,
+  "pepper": 45,
+  "cactus_meat": 20,
+  "kelp": 15,
+  "cactus_flower": 100,
+  "watermelon": 80,
+  "dragonfruit": 150,
+  "fig": 50,
+  "cave_banana": 40,
+  "acorn_cooked": 30,
+  "tallbirdegg": 200,
+  "wobster_sheller_land": 300,
+  "barnacle": 100,
+  "goatmilk": 250,
+  "butter": 1000,
+  "royal_jelly": 2000,
+  "mandrake": 5000,
+  "forgetmelots": 50,
+  "mole": 100,
+  "cutlichen": 80,
+  "eel": 120,
+  "moon_cap": 30,
+  "boneshard": 50,
+  "refined_dust": 200,
+  "nightmarefuel": 150,
+  "lightninggoathorn": 300,
+  "seeds": 15,
+};
+
+function solveIdealCombo(recipe: Recipe): string[] {
+  // Try existing idealCombo first
+  try {
+    const checkResult = cookCrockPot(recipe.idealCombo, recipe.isPortable);
+    if (checkResult.id === recipe.id) {
+      return recipe.idealCombo;
+    }
+  } catch {
+    // Ignore and solve
+  }
+
+  // 1. Gather candidate ingredients
+  const candidatesSet = new Set<string>([
+    "twigs",
+    "ice",
+    "berries",
+    "cave_banana",
+    "pomegranate",
+    "carrot",
+    "onion",
+    "smallmeat",
+    "meat",
+    "monstermeat",
+    "bird_egg",
+    "honey",
+    "fishmeat",
+    "eel",
+  ]);
+
+  // Extract from requirements EN/ZH
+  const reqStr = recipe.requirementsEN || recipe.requirementsZH;
+  if (reqStr) {
+    const parts = reqStr.split(",").map(s => s.trim());
+    for (const part of parts) {
+      if (part.toLowerCase().includes("glow berry") && part.toLowerCase().includes("lesser")) {
+        candidatesSet.add("wormlight");
+        candidatesSet.add("wormlight_lesser");
+        continue;
+      }
+      if (part.includes("×")) {
+        const match = part.match(/(.+) ×([\d.]+)/);
+        if (match) {
+          const namePart = match[1].trim().toLowerCase();
+          const subNames = namePart.split("/").map(n => n.trim());
+          for (const s of subNames) {
+            candidatesSet.add(mapNameToId(s));
+          }
+        }
+      } else if (part.includes(">") || part.includes("<") || part.includes("≥") || part.includes("≤") || part.includes("=")) {
+        const match = part.match(/(.+?)\s*([><≥≤=]|>=|<=)\s*([\d.]+)/);
+        if (match) {
+          const category = match[1].trim().toLowerCase();
+          candidatesSet.add(mapNameToId(category));
+        }
+      } else {
+        const name = part.toLowerCase().trim();
+        if (!name.startsWith("no ")) {
+          candidatesSet.add(mapNameToId(name));
+        }
+      }
+    }
+  }
+
+  // Convert to array
+  const candidates = Array.from(candidatesSet).filter(id => !!INGREDIENT_MAP[id]);
+
+  let bestCombo: string[] = ["twigs", "twigs", "twigs", "twigs"];
+  let bestCost = Infinity;
+
+  // 2. Loop through combinations of length 4 with replacement
+  const n = candidates.length;
+  for (let i = 0; i < n; i++) {
+    for (let j = i; j < n; j++) {
+      for (let k = j; k < n; k++) {
+        for (let l = k; l < n; l++) {
+          const combo = [candidates[i], candidates[j], candidates[k], candidates[l]];
+          try {
+            const result = cookCrockPot(combo, recipe.isPortable);
+            if (result.id === recipe.id) {
+              const cost = combo.reduce((sum, id) => sum + (INGREDIENT_COSTS[id] || 50), 0);
+              if (cost < bestCost) {
+                bestCost = cost;
+                bestCombo = combo;
+              }
+            }
+          } catch {
+            // Ignore
+          }
+        }
+      }
+    }
+  }
+
+  return bestCombo;
+}
+
+function translateCategoryOrTerm(name: string): string {
+  name = name.toLowerCase().trim();
+  const map: Record<string, string> = {
+    meat: "肉類",
+    veg: "蔬菜",
+    veggie: "蔬菜",
+    fruit: "水果",
+    egg: "蛋類",
+    sweetener: "甜味劑",
+    dairy: "乳製品",
+    fish: "魚類",
+    twigs: "樹枝",
+    ice: "冰塊",
+    frozen: "冰屬性",
+    monster: "怪物食材",
+    inedible: "不可食用物",
+    honey: "蜂蜜",
+    fat: "油脂",
+    magic: "魔法食材"
+  };
+  
+  if (map[name]) return map[name];
+  
+  const id = mapNameToId(name);
+  if (INGREDIENT_MAP[id]) {
+    return INGREDIENT_MAP[id].name;
+  }
+  
+  const singular = name.replace(/s$/, "");
+  if (map[singular]) return map[singular];
+  
+  const singularId = mapNameToId(singular);
+  if (INGREDIENT_MAP[singularId]) {
+    return INGREDIENT_MAP[singularId].name;
+  }
+  
+  const translations: Record<string, string> = {
+    "asparagus": "蘆筍",
+    "cave banana": "香蕉",
+    "barnacle": "藤壺",
+    "butter": "黃油",
+    "royal jelly": "蜂王漿",
+    "forget-me-lots": "必忘我",
+    "small meat": "小肉",
+    "dragon fruit": "火龍果",
+    "fig": "無花果",
+    "cactus flower": "仙人掌花",
+    "frog legs": "蛙腿",
+    "moleworm": "鼴鼠",
+    "onion": "洋蔥",
+    "ripe stone fruit": "成熟石果",
+    "cactus flesh": "仙人掌肉",
+    "kelp": "海帶",
+    "acorn": "烤樺栗果",
+    "drumstick": "鳥腿",
+    "seed": "種子",
+    "seeds": "種子",
+    "butterfly wings": "蝴蝶翅膀",
+    "koalefant trunk": "象鼻",
+    "leafy meat": "葉肉",
+    "wobster": "龍蝦",
+    "moon shroom": "月亮蘑菇",
+    "red cap": "紅蘑菇",
+    "blue cap": "藍蘑菇",
+    "green cap": "綠蘑菇",
+    "tallbird egg": "高腳鳥蛋",
+    "lichen": "地衣",
+    "bone shards": "骨頭碎片",
+    "nightmare fuel": "噩夢燃料",
+    "volt goat horn": "伏特羊角",
+    "collected dust": "塵埃",
+    "glow berry": "發光漿果",
+    "lesser glow berry": "小發光漿果",
+    "pumpkin": "南瓜",
+    "eggplant": "茄子"
+  };
+  
+  return translations[name] || translations[singular] || name;
+}
+
+export function translateRequirementsToZH(reqStr: string): string {
+  if (!reqStr || reqStr.includes("Anything")) return "無限制（任意食材）";
+  
+  const cleanStr = reqStr.replace(/\.(?!\d)/g, ",");
+  const parts = cleanStr.split(",").map(s => s.trim()).filter(Boolean);
+  const translatedParts = parts.map(part => {
+    if (part.toLowerCase().includes("glow berry") && part.toLowerCase().includes("lesser")) {
+      return "發光漿果 ×1 或 小發光漿果 ×2";
+    }
+    
+    if (part.startsWith("No ")) {
+      const category = part.replace("No ", "").trim();
+      return `不能含有${translateCategoryOrTerm(category)}`;
+    }
+    
+    if (part.includes("×")) {
+      const match = part.match(/(.+) ×([\d.]+)/);
+      if (match) {
+        const namePart = match[1].trim();
+        const count = parseFloat(match[2]);
+        const subNames = namePart.split("/").map(n => n.trim());
+        const translatedNames = subNames.map(n => translateCategoryOrTerm(n)).join("或");
+        return `${translatedNames} ×${count}`;
+      }
+    }
+    
+    const countFirstMatch = part.match(/^([\d.]+)\s+(.+)$/);
+    if (countFirstMatch) {
+      const count = parseFloat(countFirstMatch[1]);
+      const namePart = countFirstMatch[2].trim();
+      const subNames = namePart.split("/").map(n => n.trim());
+      const translatedNames = subNames.map(n => translateCategoryOrTerm(n)).join("或");
+      return `${translatedNames} ×${count}`;
+    }
+    
+    if (part.includes(">") || part.includes("<") || part.includes("≥") || part.includes("≤") || part.includes("=")) {
+      const match = part.match(/(.+?)\s*([><≥≤=]|>=|<=)\s*([\d.]+)/);
+      if (match) {
+        const category = match[1].trim();
+        const op = match[2];
+        const val = parseFloat(match[3]);
+        return `${translateCategoryOrTerm(category)} ${op} ${val}`;
+      }
+    }
+    
+    return `包含 ${translateCategoryOrTerm(part)}`;
+  });
+  
+  return translatedParts.join("，");
+}
+
+// Compile and merge the lists
+const compiledRecipes: Recipe[] = [];
+
+// Filter cooking recipes to include only cookpot and portablecookpot
+const validCookingRecipes = cookingRecipes.filter(
+  r => r.station === "cookpot" || r.station === "portablecookpot"
+);
+
+for (const raw of validCookingRecipes) {
+  // Map raw ID to old ID if it's one of the 23 original recipes
+  const targetId = newToOldIdMap[raw.id] || raw.id;
+
+  // Check if we have an existing hand-crafted recipe to preserve descriptions and canCookWith functions
+  const existing = existingRecipes.find(r => r.id === targetId);
+
+  const tcName = recipeNameTranslations[raw.name] || raw.name;
+  const canCookWith = existing ? existing.canCookWith : parseRequirements(raw.requirements);
+
+  // Expand idealCombo from cardIngredients
+  const idealCombo: string[] = [];
+  if (raw.cardIngredients) {
+    for (const [ingId, count] of raw.cardIngredients) {
+      for (let i = 0; i < count; i++) {
+        idealCombo.push(mapNameToId(ingId));
+      }
+    }
+  }
+  // Fill to 4 slots if under 4 slots using twigs / filler
+  while (idealCombo.length < 4) {
+    idealCombo.push("twigs");
+  }
+
+  const recipe: Recipe = {
+    id: targetId,
+    name: tcName,
+    englishName: raw.name,
+    hp: raw.health,
+    hunger: raw.hunger,
+    sanity: raw.sanity,
+    cookTime: raw.cookTime * 20,
+    perishDays: raw.perishDays === null ? 999 : raw.perishDays,
+    priority: raw.priority,
+    requirementsZH: translateRequirementsToZH(raw.requirements),
+    requirementsEN: raw.requirements,
+    canCookWith: canCookWith,
+    idealCombo: existing ? existing.idealCombo : idealCombo.slice(0, 4),
+    description: existing ? existing.description : `《DST》官方食譜中的經典烹飪菜餚，優先度為 ${raw.priority}。`,
+    isPortable: raw.station === "portablecookpot"
+  };
+
+  compiledRecipes.push(recipe);
+}
+
+// Solve/verify idealCombo for all compiled recipes
+for (const recipe of compiledRecipes) {
+  recipe.idealCombo = solveIdealCombo(recipe);
+}
+
+// Export combined RECIPES
+export const RECIPES: Recipe[] = compiledRecipes;
+
+// Helper function to sum up parameters
 export function sumIngredients(ingredientIds: string[]): Record<string, number> {
   const totals: Record<string, number> = {
     meat: 0,
@@ -339,6 +659,8 @@ export function sumIngredients(ingredientIds: string[]): Record<string, number> 
     mole: 0,
     lichen: 0,
     eel: 0,
+    fat: 0,
+    magic: 0,
   };
 
   for (const id of ingredientIds) {
@@ -350,421 +672,29 @@ export function sumIngredients(ingredientIds: string[]): Record<string, number> 
         }
       }
     }
+    // Handle special tags like fat and magic for soothing tea
+    if (id === "butter") totals.fat = (totals.fat || 0) + 1;
+    if (id === "mandrake") totals.magic = (totals.magic || 0) + 1;
   }
   return totals;
 }
 
-// 2. Recipes List
-export const RECIPES: Recipe[] = [
-  {
-    id: "mandrake_soup",
-    name: "曼德拉草湯",
-    englishName: "Mandrake Soup",
-    hp: 100,
-    hunger: 150,
-    sanity: 5,
-    cookTime: 60,
-    perishDays: 6,
-    priority: 30,
-    requirementsZH: "包含至少 1 個曼德拉草",
-    requirementsEN: "At least 1 Mandrake",
-    idealCombo: ["mandrake", "twigs", "twigs", "twigs"],
-    description: "大補品！能夠回復極大量的生命值和飢餓值，一喝下去瞬間拉滿！",
-    canCookWith: (t) => t.mandrake >= 1,
-  },
-  {
-    id: "waffles",
-    name: "鬆餅",
-    englishName: "Waffles",
-    hp: 60,
-    hunger: 37.5,
-    sanity: 5,
-    cookTime: 10,
-    perishDays: 6,
-    priority: 10,
-    requirementsZH: "包含 1 個黃油、至少 1 個蛋、1 個漿果",
-    requirementsEN: "1 Butter, 1 Egg, 1 Berries",
-    idealCombo: ["butter", "egg", "berries", "twigs"],
-    description: "高檔奢華甜食！需要極為罕見的黃油（擊殺蝴蝶 2% 機率獲得）。生命值恢復量僅次於曼德拉草湯！",
-    canCookWith: (t, ings) => {
-      const hasButter = ings.some(i => i.id === "butter");
-      const hasBerries = ings.some(i => i.id === "berries");
-      return hasButter && t.egg >= 1 && hasBerries;
-    },
-  },
-  {
-    id: "surf_n_turf",
-    name: "海陸雙拼",
-    englishName: "Surf 'n' Turf",
-    hp: 60,
-    hunger: 37.5,
-    sanity: 33,
-    cookTime: 20,
-    perishDays: 10,
-    priority: 30,
-    requirementsZH: "肉類係數 >= 2.5 且 魚類係數 >= 1.5，不能有冰塊",
-    requirementsEN: "Meat >= 2.5, Fish >= 1.5. No Ice",
-    idealCombo: ["large_meat", "large_meat", "fish", "fish"],
-    description: "超級出色的中後期料理，高額回復生命值與精神值。在船難或聯機版地洞垂釣中極受歡迎！",
-    canCookWith: (t) => t.meat >= 2.5 && t.fish >= 1.5 && t.ice === 0,
-  },
-  {
-    id: "ice_cream",
-    name: "冰淇淋",
-    englishName: "Ice Cream",
-    hp: 0,
-    hunger: 25,
-    sanity: 50,
-    cookTime: 15,
-    perishDays: 3,
-    priority: 10,
-    requirementsZH: "至少 1 個乳製品、1 個冰塊、1 個甜味劑。不能包含肉類、蔬菜、樹枝",
-    requirementsEN: "At least 1 Dairy, 1 Ice, 1 Sweetener. No Meat, Veg, or Twigs",
-    idealCombo: ["electric_milk", "ice", "honey", "honey"],
-    description: "精神回復之王（+50）！夏日降溫神物，但保存期限非常短暫，建議現做現吃。",
-    canCookWith: (t) => t.dairy >= 1 && t.ice >= 1 && t.sweetener >= 1 && t.meat === 0 && t.veg === 0 && t.twigs === 0,
-  },
-  {
-    id: "pierogi",
-    name: "波蘭餃子",
-    englishName: "Pierogi",
-    hp: 40,
-    hunger: 37.5,
-    sanity: 5,
-    cookTime: 20,
-    perishDays: 20,
-    priority: 5,
-    requirementsZH: "包含肉類係數 >= 0.5、蛋類係數 >= 1、蔬菜類係數 >= 0.5。不能有樹枝",
-    requirementsEN: "Meat >= 0.5, Egg >= 1, Veg >= 0.5. No Twigs",
-    idealCombo: ["monster_meat", "egg", "carrot", "berries"],
-    description: "飢荒「性價比最高」的打怪戰鬥回血神藥。保存時間極長（20天），材料極易取得！",
-    canCookWith: (t) => t.meat >= 0.5 && t.egg >= 1 && t.veg >= 0.5 && t.twigs === 0,
-  },
-  {
-    id: "dragonpie",
-    name: "火龍果派",
-    englishName: "Dragonpie",
-    hp: 40,
-    hunger: 75,
-    sanity: 5,
-    cookTime: 40,
-    perishDays: 15,
-    priority: 1,
-    requirementsZH: "包含至少 1 個火龍果。不能包含任何肉類",
-    requirementsEN: "At least 1 Dragon Fruit. No Meat",
-    idealCombo: ["dragonfruit", "twigs", "twigs", "twigs"],
-    description: "素食玩家與中後期基地的必備至尊！一個火龍果加上三個樹枝就能做出來（極致省料）。",
-    canCookWith: (t) => t.dragonfruit >= 1 && t.meat === 0,
-  },
-  {
-    id: "fishsticks",
-    name: "魚條",
-    englishName: "Fishsticks",
-    hp: 40,
-    hunger: 37.5,
-    sanity: 5,
-    cookTime: 40,
-    perishDays: 10,
-    priority: 10,
-    requirementsZH: "包含至少 1 個魚肉、至少 1 個樹枝。且肉類係數 <= 1.0",
-    requirementsEN: "At least 1 Fish, 1 Twigs. Meat <= 1.0",
-    idealCombo: ["fish", "twigs", "berries", "berries"],
-    description: "池塘垂釣愛好者的回血神物（高達+40血），做法簡單，加一根樹枝即可成型。",
-    canCookWith: (t) => t.fish >= 0.25 && t.twigs >= 1 && t.meat <= 1.0,
-  },
-  {
-    id: "flower_salad",
-    name: "鮮花沙拉",
-    englishName: "Flower Salad",
-    hp: 40,
-    hunger: 12.5,
-    sanity: 5,
-    cookTime: 10,
-    perishDays: 6,
-    priority: 10,
-    requirementsZH: "包含至少 1 個仙人掌花、蔬菜係數 >= 1.5。不能有肉類",
-    requirementsEN: "At least 1 Cactus Flower, Veg >= 1.5. No Meat",
-    idealCombo: ["cactus_flower", "cactus_flesh", "cactus_flesh", "berries"],
-    description: "夏季限定高回血料理（+40），仙人掌開花時的絕佳美味，素食玩家首選。",
-    canCookWith: (t) => t.flower >= 1 && t.veg >= 1.5 && t.meat === 0,
-  },
-  {
-    id: "trail_mix",
-    name: "綜合堅果",
-    englishName: "Trail Mix",
-    hp: 30,
-    hunger: 12.5,
-    sanity: 5,
-    cookTime: 40,
-    perishDays: 15,
-    priority: 10,
-    requirementsZH: "熟樺木果 >= 1、漿果 >= 1、水果類 >= 1.0。不能包含肉類、蔬菜、蛋類、乳製品",
-    requirementsEN: "1 Roasted Birchnut, 1 Berries, Fruit >= 1.0. No Meat, Veg, Egg, or Dairy",
-    idealCombo: ["roasted_birchnut", "berries", "berries", "twigs"],
-    description: "秋季砍樺樹最愛的保命零食，回血 30 性價比突出。注意原材料必須是「烤過」的樹果！",
-    canCookWith: (t, ings) => {
-      const hasBirchnut = ings.some(i => i.id === "roasted_birchnut");
-      const hasBerries = ings.some(i => i.id === "berries");
-      return (
-        hasBirchnut &&
-        hasBerries &&
-        t.fruit >= 1.0 &&
-        t.meat === 0 &&
-        t.veg === 0 &&
-        t.egg === 0 &&
-        t.dairy === 0
-      );
-    },
-  },
-  {
-    id: "unagi",
-    name: "鰻魚料理",
-    englishName: "Unagi",
-    hp: 20,
-    hunger: 18.75,
-    sanity: 5,
-    cookTime: 10,
-    perishDays: 10,
-    priority: 20,
-    requirementsZH: "包含至少 1 個鰻魚、1 個洞穴苔蘚",
-    requirementsEN: "At least 1 Eel, 1 Lichen",
-    idealCombo: ["eel", "lichen", "twigs", "twigs"],
-    description: "地洞深處釣鰻魚者的常規點心，烹飪迅速，屬快遞料理。",
-    canCookWith: (t, ings) => {
-      const hasEel = ings.some(i => i.id === "eel");
-      const hasLichen = ings.some(i => i.id === "lichen");
-      return hasEel && hasLichen;
-    },
-  },
-  {
-    id: "guacamole",
-    name: "酪梨沙拉",
-    englishName: "Guacamole",
-    hp: 20,
-    hunger: 37.5,
-    sanity: 10,
-    cookTime: 10,
-    perishDays: 10,
-    priority: 10,
-    requirementsZH: "包含至少 1 個活鼴鼠、1 個仙人掌肉或蔬菜。不能有水果",
-    requirementsEN: "At least 1 Live Mole, 1 Cactus/Veg. No Fruit",
-    idealCombo: ["mole", "cactus_flesh", "twigs", "twigs"],
-    description: "風味獨特，能稍微回復精神。捕捉一隻肥碩的鼴鼠放入砂鍋中敲暈製作！",
-    canCookWith: (t) => t.mole >= 1 && t.veg >= 1.0 && t.fruit === 0,
-  },
-  {
-    id: "butter_muffin",
-    name: "蝴蝶鬆餅",
-    englishName: "Butter Muffin",
-    hp: 20,
-    hunger: 37.5,
-    sanity: 5,
-    cookTime: 40,
-    perishDays: 15,
-    priority: 1,
-    requirementsZH: "包含 1 個蝴蝶翅膀、蔬菜係數 >= 0.5。不能含有肉類",
-    requirementsEN: "1 Butterfly Wings, Veg >= 0.5. No Meat",
-    idealCombo: ["butterfly_wings", "carrot", "twigs", "twigs"],
-    description: "綠地探險與前期保命不可多得的美味（回血20），僅需拍扁一條蝴蝶加根胡蘿蔔!",
-    canCookWith: (t, ings) => {
-      const hasButterfly = ings.some(i => i.id === "butterfly_wings");
-      return hasButterfly && t.veg >= 0.5 && t.meat === 0;
-    },
-  },
-  {
-    id: "turkey_dinner",
-    name: "火雞大餐",
-    englishName: "Turkey Dinner",
-    hp: 20,
-    hunger: 75,
-    sanity: 5,
-    cookTime: 60,
-    perishDays: 6,
-    priority: 10,
-    requirementsZH: "包含至少 2 個火雞腿、肉類係數 > 1.0、且有 0.5 以上的水果或蔬菜",
-    requirementsEN: "At least 2 Drumsticks, Meat > 1.0, Fruit/Veg >= 0.5",
-    idealCombo: ["drumstick", "drumstick", "monster_meat", "carrot"],
-    description: "飽腹感拉滿的美味派對火雞！也是對付騷擾灌木叢火雞的香噴噴報復餐。",
-    canCookWith: (t) => t.drumstick >= 2 && t.meat > 1.0 && (t.veg >= 0.5 || t.fruit >= 0.5),
-  },
-  {
-    id: "bacon_and_eggs",
-    name: "培根蛋",
-    englishName: "Bacon and Eggs",
-    hp: 20,
-    hunger: 75,
-    sanity: 5,
-    cookTime: 40,
-    perishDays: 20,
-    priority: 10,
-    requirementsZH: "蛋類係數 >= 2.0、肉類係數 > 1.5。不能包含蔬菜",
-    requirementsEN: "Egg >= 2.0, Meat > 1.5. No Veg",
-    idealCombo: ["monster_meat", "morsel", "egg", "egg"],
-    description: "高飽腹（75）、保質期極長（20天）的優質出遠門口糧，但會消耗較多肉與蛋。",
-    canCookWith: (t) => t.egg >= 2.0 && t.meat > 1.5 && t.veg === 0,
-  },
-  {
-    id: "melonsicle",
-    name: "西瓜冰棒",
-    englishName: "Melonsicle",
-    hp: 3,
-    hunger: 12.5,
-    sanity: 20,
-    cookTime: 10,
-    perishDays: 3,
-    priority: 10,
-    requirementsZH: "包含至少 1 個西瓜、1 個冰塊、1 個樹枝。不能有肉類、蔬菜",
-    requirementsEN: "At least 1 Watermelon, 1 Ice, 1 Twigs. No Meat, No Veg",
-    idealCombo: ["watermelon", "ice", "twigs", "twigs"],
-    description: "精神回復利器 (+20 三分)。夏日解暑必備，自帶降溫效果，非常消暑。",
-    canCookWith: (t, ings) => {
-      const hasWatermelon = ings.some(i => i.id === "watermelon");
-      return hasWatermelon && t.ice >= 1 && t.twigs >= 1 && t.meat === 0 && t.veg === 0;
-    },
-  },
-  {
-    id: "taffy",
-    name: "太妃糖",
-    englishName: "Taffy",
-    hp: -3,
-    hunger: 25,
-    sanity: 15,
-    cookTime: 40,
-    perishDays: 15,
-    priority: 10,
-    requirementsZH: "包含至少 3 個甜味劑。不能含肉",
-    requirementsEN: "At least 3 Sweeteners. No Meat",
-    idealCombo: ["honey", "honey", "honey", "twigs"],
-    description: "前期性價比極高的回腦（精神+15）料理，但也因為太甜會微幅扣減生命 3 點。",
-    canCookWith: (t) => t.sweetener >= 3 && t.meat === 0,
-  },
-  {
-    id: "meaty_stew",
-    name: "肉湯",
-    englishName: "Meaty Stew",
-    hp: 12,
-    hunger: 150,
-    sanity: 5,
-    cookTime: 15,
-    perishDays: 10,
-    priority: 0,
-    requirementsZH: "肉類係數 >= 3.0。不能包含樹枝、怪物肉係數 <= 1.0",
-    requirementsEN: "Meat >= 3.0. No Twigs, Monster <= 1.0",
-    idealCombo: ["large_meat", "large_meat", "morsel", "morsel"],
-    description: "飢餓值大魔王（+150）！一鍋下去大部分角色能直接吃撐。注意不能有樹枝，否則會變肉串甚至是濕滑焦糊。",
-    canCookWith: (t) => t.meat >= 3.0 && t.twigs === 0 && t.monster <= 1,
-  },
-  {
-    id: "meatballs",
-    name: "肉丸",
-    englishName: "Meatballs",
-    hp: 3,
-    hunger: 62.5,
-    sanity: 5,
-    cookTime: 15,
-    perishDays: 10,
-    priority: -1,
-    requirementsZH: "肉類係數 >= 0.5。不能含有樹枝",
-    requirementsEN: "Meat >= 0.5. No Twigs",
-    idealCombo: ["monster_meat", "berries", "berries", "berries"],
-    description: "飢荒新手老手的大眾常客，俗稱「萬能飽腹神丸」。放一塊怪物肉與三個漿果，高達 62.5 飢餓值回復！",
-    canCookWith: (t) => t.meat >= 0.5 && t.twigs === 0,
-  },
-  {
-    id: "fist_full_of_jam",
-    name: "果醬蜜餞",
-    englishName: "Fist Full of Jam",
-    hp: 3,
-    hunger: 37.5,
-    sanity: 5,
-    cookTime: 10,
-    perishDays: 15,
-    priority: 0,
-    requirementsZH: "水果係數 >= 0.5。不能包含肉類、蔬菜、樹枝",
-    requirementsEN: "Fruit >= 0.5. No Meat, Veg, or Twigs",
-    idealCombo: ["berries", "berries", "berries", "ice"],
-    description: "簡單極致的水果甜食，沒有肉菜時可以烹飪用於前期飽腹。",
-    canCookWith: (t) => t.fruit >= 0.5 && t.meat === 0 && t.veg === 0 && t.twigs === 0,
-  },
-  {
-    id: "ratatouille",
-    name: "蔬菜雜燴",
-    englishName: "Ratatouille",
-    hp: 3,
-    hunger: 25,
-    sanity: 5,
-    cookTime: 20,
-    perishDays: 15,
-    priority: 0,
-    requirementsZH: "蔬菜係數 >= 0.5。不能包含肉類、樹枝",
-    requirementsEN: "Veg >= 0.5. No Meat, No Twigs",
-    idealCombo: ["carrot", "berries", "berries", "berries"],
-    description: "清淡健康的素食小餐，蔬菜溢出時可以作為保溫素食。",
-    canCookWith: (t) => t.veg >= 0.5 && t.meat === 0 && t.twigs === 0,
-  },
-  {
-    id: "kabobs",
-    name: "肉串",
-    englishName: "Kabobs",
-    hp: 3,
-    hunger: 37.5,
-    sanity: 5,
-    cookTime: 40,
-    perishDays: 15,
-    priority: 5,
-    requirementsZH: "肉類係數 >= 0.5、樹枝 >= 1。怪物肉係數 <= 1.0",
-    requirementsEN: "Meat >= 0.5, Twigs >= 1. Monster <= 1.0",
-    idealCombo: ["morsel", "twigs", "berries", "berries"],
-    description: "最便宜的烤肉串！可以用樹枝作為烤籤與多餘的肉屑來烹飪。",
-    canCookWith: (t) => t.meat >= 0.5 && t.twigs >= 1 && t.monster <= 1,
-  },
-  {
-    id: "monster_lasagna",
-    name: "怪物千層麵",
-    englishName: "Monster Lasagna",
-    hp: -20,
-    hunger: 37.5,
-    sanity: -20,
-    cookTime: 10,
-    perishDays: 6,
-    priority: 10,
-    requirementsZH: "包含至少 2 個怪物食物（如怪物肉、榴槤）。不能有樹枝",
-    requirementsEN: "At least 2 Monster items. No Twigs",
-    idealCombo: ["monster_meat", "monster_meat", "berries", "berries"],
-    description: "極其致命的紫紅色千層麵，正常角色吃下會大幅流失生命與神智。只有韋伯（Webber）可以免疫其副作用！",
-    canCookWith: (t) => t.monster >= 2 && t.twigs === 0,
-  },
-  {
-    id: "wet_goop",
-    name: "濕滑焦糊",
-    englishName: "Wet Goop",
-    hp: 0,
-    hunger: 0,
-    sanity: 0,
-    cookTime: 5,
-    perishDays: 6,
-    priority: -2,
-    requirementsZH: "當放入的食材完全不符合任何其他食譜時，會變成這款毫無用處的焦黑菜渣。",
-    requirementsEN: "Matches when no other combination is met",
-    idealCombo: ["twigs", "twigs", "twigs", "twigs"],
-    description: "烹飪災難！浪費了精力與食材後得到的一坨無法下嚥的焦黑糊糊。",
-    canCookWith: () => true, // Fallback
-  }
-];
-
 // Helper function to calculate Crock Pot output for 4 selected ingredient IDs
-export function cookCrockPot(selectedIds: string[]): Recipe {
+export function cookCrockPot(selectedIds: string[], isPortable: boolean = false): Recipe {
   if (selectedIds.length !== 4) {
-    return RECIPES.find((r) => r.id === "wet_goop")!;
+    return compiledRecipes.find((r) => r.id === "wet_goop")!;
   }
 
   const totals = sumIngredients(selectedIds);
   const selectedIngredients = selectedIds.map((id) => INGREDIENT_MAP[id]).filter(Boolean);
 
   // Filter recipes whose requirements are satisfied
-  const matchingRecipes = RECIPES.filter((recipe) => {
-    // Wet goop can match anytime but has priority -2.
+  const matchingRecipes = compiledRecipes.filter((recipe) => {
     if (recipe.id === "wet_goop") return true;
+    
+    // Ignore Warly-exclusive recipes if not using a portable crockpot
+    if (!isPortable && recipe.isPortable) return false;
+
     try {
       return recipe.canCookWith(totals, selectedIngredients);
     } catch {
@@ -773,7 +703,7 @@ export function cookCrockPot(selectedIds: string[]): Recipe {
   });
 
   if (matchingRecipes.length === 0) {
-    return RECIPES.find((r) => r.id === "wet_goop")!;
+    return compiledRecipes.find((r) => r.id === "wet_goop")!;
   }
 
   // Sort by priority landing the highest priority on index 0
@@ -783,25 +713,13 @@ export function cookCrockPot(selectedIds: string[]): Recipe {
 }
 
 // Check what recipes are "cookable" if the user has ONLY access to the subset of checkedIngredients
-// Since quantities of checked ingredients are not specified (it's a binary checklist), we check if there exists
-// a combination of 4 items picked from the checked list that yields the recipe.
-export function getCookableRecipes(checkedIds: string[]): Recipe[] {
+export function getCookableRecipes(checkedIds: string[], isPortable: boolean = false): Recipe[] {
   if (checkedIds.length === 0) return [];
 
-  // Generate all 4-combinations of checked ids (with replacement, since we can pick multiple of the same type)
-  // To make it efficient and highly accurate:
-  // Since 4 items are picked fromcheckedIds, if checkedIds length is N, the number of combinations with replacement is (N + 3 choose 4).
-  // E.g., for N=5, combinations with replacement: (5+3) choose 4 = 8 choose 4 = 70 combinations, which is extremely small!
-  // Even for N=25 (all ingredients): (25+3) choose 4 = 28 choose 4 = 20,475 combinations.
-  // We can optimize. A recipe can be cooked if we can find AT LEAST ONE valid 4-item list from checkedIds that results in this recipe.
   const cookableMap: Record<string, boolean> = {};
-
-  // Find all possible outputs of any 4-combination of the checkedIds
-  // Helper to get combinations with replacement
   const combinations: string[][] = [];
   const n = checkedIds.length;
 
-  // Let's do a fast recursive or direct combination generator up to size 4
   const current: string[] = [];
   function generateCombos(index: number, depth: number) {
     if (depth === 4) {
@@ -815,16 +733,240 @@ export function getCookableRecipes(checkedIds: string[]): Recipe[] {
     }
   }
 
-  // Optimize: if n is very large, generating combinations might take time.
-  // But wait! N is at most 25 (our INGREDIENTS list).
-  // Let's run a simple loop or limit it. Generating combos is fast in JS.
-  // 20475 calculations takes ~1-3 milliseconds in modern engines.
   generateCombos(0, 0);
 
   for (const combo of combinations) {
-    const result = cookCrockPot(combo);
+    const result = cookCrockPot(combo, isPortable);
     cookableMap[result.id] = true;
   }
 
-  return RECIPES.filter((r) => cookableMap[r.id]);
+  return compiledRecipes.filter((r) => cookableMap[r.id]);
+}
+
+export function isRecipeRelated(recipe: Recipe, checkedIds: string[]): boolean {
+  if (checkedIds.length === 0) return false;
+  
+  // 1. Check if any checked ingredient is in the idealCombo
+  if (recipe.idealCombo.some(id => checkedIds.includes(id))) {
+    return true;
+  }
+  
+  // 2. Check if any checked ingredient's category is used in the requirements
+  const checkedIngs = checkedIds.map(id => INGREDIENT_MAP[id]).filter(Boolean);
+  
+  const reqStr = recipe.requirementsEN || recipe.requirementsZH;
+  if (!reqStr) return false;
+  
+  const parts = reqStr.split(",").map(s => s.trim());
+  for (const part of parts) {
+    if (part.startsWith("No ")) continue; // Skip negative requirements
+    
+    // Check if category matches
+    for (const ing of checkedIngs) {
+      const tags = Object.keys(ing.values || {});
+      for (const tag of tags) {
+        const regex = new RegExp(`\\b${tag}\\b`, "i");
+        if (regex.test(part)) return true;
+        
+        const tag1 = mapCategoryToTag(tag);
+        const partWords = part.split(/[^a-zA-Z]/).map(w => w.trim().toLowerCase());
+        if (partWords.some(pw => mapCategoryToTag(pw) === tag1)) {
+          return true;
+        }
+      }
+      
+      const nameRegex = new RegExp(`\\b${ing.englishName}\\b`, "i");
+      if (nameRegex.test(part)) return true;
+    }
+  }
+  
+  return false;
+}
+
+export function translateCategory(tag: string): string {
+  const map: Record<string, string> = {
+    meat: "肉類",
+    veg: "蔬菜",
+    fruit: "水果",
+    egg: "蛋類",
+    sweetener: "甜味劑",
+    dairy: "乳製品",
+    fish: "魚類",
+    twigs: "樹枝",
+    ice: "冰塊",
+    frozen: "冰屬性",
+    monster: "怪物食材",
+    inedible: "不可食用物"
+  };
+  return map[tag] || tag;
+}
+
+export function translateTerm(name: string): string {
+  const map: Record<string, string> = {
+    "honey": "蜂蜜",
+    "asparagus": "蘆筍",
+    "cave banana": "洞穴香蕉",
+    "barnacle": "藤壺",
+    "butter": "黃油",
+    "royal jelly": "蜂王乳",
+    "forget-me-lots": "勿忘我",
+    "small meat": "小肉",
+    "dragon fruit": "火龍果",
+    "fig": "無花果",
+    "cactus flower": "仙人掌花",
+    "frog legs": "蛙腿",
+    "moleworm": "活鼴鼠",
+    "onion": "洋蔥",
+    "ripe stone fruit": "成熟石果",
+    "cactus flesh": "仙人掌肉",
+    "kelp": "海帶",
+    "acorn": "烤樺木果",
+    "drumstick": "火雞腿",
+    "seed": "種子",
+    "seeds": "種子",
+    "butterfly wings": "蝴蝶翅膀",
+    "koalefant trunk": "象鼻",
+    "leafy meat": "葉肉",
+    "wobster": "龍蝦",
+    "moon shroom": "月亮蘑菇",
+    "red cap": "紅蘑菇",
+    "blue cap": "藍蘑菇",
+    "green cap": "綠蘑菇",
+    "tallbird egg": "高鳥蛋",
+    "lichen": "地衣",
+    "bone shards": "骨片",
+    "nightmare fuel": "噩夢燃料",
+    "volt goat horn": "伏特羊角",
+    "collected dust": "精煉粉塵",
+    "glow berry": "發光漿果",
+    "lesser glow berry": "小發光漿果",
+    "pumpkin": "南瓜",
+    "eggplant": "茄子"
+  };
+  return map[name.toLowerCase().trim()] || name;
+}
+
+export function getMissingRequirements(recipe: Recipe, checkedIds: string[]): string[] {
+  const totals = sumIngredients(checkedIds);
+  const checkedIngredients = checkedIds.map(id => INGREDIENT_MAP[id]).filter(Boolean);
+
+  const missing: string[] = [];
+  
+  const reqStr = recipe.requirementsEN || recipe.requirementsZH;
+  if (!reqStr || reqStr.includes("Anything")) return [];
+
+  const cleanStr = reqStr.replace(/\.(?!\d)/g, ",");
+  const parts = cleanStr.split(",").map(s => s.trim()).filter(Boolean);
+  
+  for (const part of parts) {
+    if (part.toLowerCase().includes("glow berry") && part.toLowerCase().includes("lesser")) {
+      const glowBerryCount = checkedIngredients.filter(i => i.id === "wormlight").length;
+      const lesserGlowBerryCount = checkedIngredients.filter(i => i.id === "wormlight_lesser").length;
+      if (glowBerryCount < 1 && lesserGlowBerryCount < 2) {
+        missing.push("發光漿果 ×1 或 小發光漿果 ×2");
+      }
+      continue;
+    }
+    
+    if (part.startsWith("No ")) {
+      const category = part.replace("No ", "").trim();
+      const tag = mapCategoryToTag(category);
+      if ((totals[tag] || 0) > 0) {
+        missing.push(`不能含有${translateCategoryOrTerm(category)}`);
+      }
+      continue;
+    }
+    
+    // Format: "Name ×Count"
+    if (part.includes("×")) {
+      const match = part.match(/(.+) ×([\d.]+)/);
+      if (match) {
+        const namePart = match[1].trim();
+        const count = parseFloat(match[2]);
+        const tag = mapCategoryToTag(namePart);
+        const categoriesList = ["meat", "veg", "fruit", "egg", "sweetener", "dairy", "fish", "twigs", "ice"];
+        if (categoriesList.includes(tag)) {
+          const current = totals[tag] || 0;
+          if (current < count) {
+            missing.push(`${translateCategoryOrTerm(namePart)} 需包含 ×${count}`);
+          }
+        } else {
+          const subNames = namePart.split("/").map(n => n.trim());
+          const subIds = subNames.map(mapNameToId);
+          const matchedIngsCount = checkedIngredients.filter(i => subIds.includes(i.id)).length;
+          if (matchedIngsCount < count) {
+            const translatedNames = subNames.map(n => translateCategoryOrTerm(n)).join("或");
+            missing.push(`必須包含 ${translatedNames} ×${count}`);
+          }
+        }
+      }
+      continue;
+    }
+    
+    // Format: "Count Name" (e.g. "1 Butterfly Wings")
+    const countFirstMatch = part.match(/^([\d.]+)\s+(.+)$/);
+    if (countFirstMatch) {
+      const count = parseFloat(countFirstMatch[1]);
+      const namePart = countFirstMatch[2].trim();
+      const tag = mapCategoryToTag(namePart);
+      const categoriesList = ["meat", "veg", "fruit", "egg", "sweetener", "dairy", "fish", "twigs", "ice"];
+      if (categoriesList.includes(tag)) {
+        const current = totals[tag] || 0;
+        if (current < count) {
+          missing.push(`${translateCategoryOrTerm(namePart)} 需包含 ×${count}`);
+        }
+      } else {
+        const subNames = namePart.split("/").map(n => n.trim());
+        const subIds = subNames.map(mapNameToId);
+        const matchedIngsCount = checkedIngredients.filter(i => subIds.includes(i.id)).length;
+        if (matchedIngsCount < count) {
+          const translatedNames = subNames.map(n => translateCategoryOrTerm(n)).join("或");
+          missing.push(`必須包含 ${translatedNames} ×${count}`);
+        }
+      }
+      continue;
+    }
+    
+    // Format: "Category/Name >= Count" etc.
+    if (part.includes(">") || part.includes("<") || part.includes("≥") || part.includes("≤") || part.includes("=")) {
+      const match = part.match(/(.+?)\s*([><≥≤=]|>=|<=)\s*([\d.]+)/);
+      if (match) {
+        const category = match[1].trim();
+        const op = match[2];
+        const val = parseFloat(match[3]);
+        const tag = mapCategoryToTag(category);
+        const currentVal = totals[tag] || 0;
+
+        let satisfied = false;
+        if (op === ">") satisfied = currentVal > val;
+        else if (op === "<") satisfied = currentVal < val;
+        else if (op === "≥" || op === ">=") satisfied = currentVal >= val;
+        else if (op === "≤" || op === "<=") satisfied = currentVal <= val;
+        else if (op === "=") satisfied = currentVal === val;
+
+        if (!satisfied) {
+          missing.push(`${translateCategoryOrTerm(category)} 需滿足 ${op} ${val}`);
+        }
+      }
+      continue;
+    }
+    
+    // Single word requirement
+    const name = part.trim();
+    const tag = mapCategoryToTag(name);
+    const categoriesList = ["meat", "veg", "fruit", "egg", "sweetener", "dairy", "fish", "twigs", "ice"];
+    if (categoriesList.includes(tag)) {
+      const current = totals[tag] || 0;
+      if (current < 0.5) {
+        missing.push(`需要包含 ${translateCategoryOrTerm(name)} (至少 0.5)`);
+      }
+    } else {
+      const ingId = mapNameToId(name);
+      if (!checkedIds.includes(ingId)) {
+        missing.push(`必須包含 ${translateCategoryOrTerm(name)}`);
+      }
+    }
+  }
+
+  return missing;
 }

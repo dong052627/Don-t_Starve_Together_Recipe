@@ -31,7 +31,95 @@ import {
   sumIngredients,
   Recipe,
   Ingredient,
+  isRecipeRelated,
+  getMissingRequirements,
 } from "./recipesData";
+
+export function getRecipeEmoji(id: string): string {
+  const emojiMap: Record<string, string> = {
+    mandrake_soup: "🍲",
+    mandrakesoup: "🍲",
+    waffles: "🧇",
+    surf_n_turf: "🍱",
+    surfnturf: "🍱",
+    ice_cream: "🍧",
+    icecream: "🍧",
+    pierogi: "🥟",
+    perogies: "🥟",
+    dragonpie: "🥮",
+    fishsticks: "🍤",
+    flower_salad: "🥗",
+    flowersalad: "🥗",
+    trail_mix: "🍒",
+    trailmix: "🍒",
+    unagi: "🍣",
+    guacamole: "🦎",
+    bacon_and_eggs: "🍳",
+    baconeggs: "🍳",
+    butter_muffin: "🧁",
+    butterflymuffin: "🧁",
+    turkey_dinner: "🦃",
+    turkeydinner: "🦃",
+    melonsicle: "🍉",
+    watermelonicle: "🍉",
+    taffy: "🍬",
+    meaty_stew: "🥣",
+    bonestew: "🥣",
+    meatballs: "🧆"
+  };
+  return emojiMap[id] || "🍛";
+}
+
+function RecipeImage({ recipeId, className = "w-8 h-8 object-contain" }: { recipeId: string; className?: string }) {
+  const [error, setError] = useState(false);
+  const basePath = (import.meta as any).env.BASE_URL || "/";
+  const src = `${basePath}images/recipes/${recipeId}.png`;
+
+  if (error) {
+    return <span className="text-xl">{getRecipeEmoji(recipeId)}</span>;
+  }
+
+  return (
+    <img
+      src={src}
+      onError={() => setError(true)}
+      className={className}
+      alt=""
+    />
+  );
+}
+
+function IngredientImage({ ingredientId, avatarText, className = "w-6 h-6 object-contain" }: { ingredientId: string; avatarText: string; className?: string }) {
+  const [error, setError] = useState(false);
+  const basePath = (import.meta as any).env.BASE_URL || "/";
+  const src = `${basePath}images/ingredients/${ingredientId}.png`;
+
+  if (error) {
+    return <span className="shrink-0">{avatarText}</span>;
+  }
+
+  return (
+    <img
+      src={src}
+      onError={() => setError(true)}
+      className={className}
+      alt=""
+    />
+  );
+}
+
+function StateIcon({ type, className = "w-5 h-5 object-contain" }: { type: "hp" | "hunger" | "sanity"; className?: string }) {
+  const basePath = (import.meta as any).env.BASE_URL || "/";
+  const filename = type === "hp" ? "HealthMeter.webp" : type === "hunger" ? "Hunger.webp" : "Sanity.webp";
+  const src = `${basePath}images/state/${filename}`;
+  return (
+    <img
+      src={src}
+      className={className}
+      alt={type}
+    />
+  );
+}
 
 export default function App() {
   // Global states
@@ -58,25 +146,14 @@ export default function App() {
   };
   
   // States for Ingredient Checker mode
-  // Default checked ingredients include a nice balance so the page starts with active items
-  const [checkedIngredients, setCheckedIngredients] = useState<string[]>([
-    "large_meat",
-    "morsel",
-    "monster_meat",
-    "carrot",
-    "mushroom",
-    "berries",
-    "ice",
-    "twigs",
-    "egg",
-    "honey"
-  ]);
+  const [checkedIngredients, setCheckedIngredients] = useState<string[]>([]);
 
   // States for Crock Pot Simulator mode
   const [potSlots, setPotSlots] = useState<string[]>(["", "", "", ""]);
   const [isCooking, setIsCooking] = useState(false);
   const [cookingProgress, setCookingProgress] = useState(0);
   const [simulatedResult, setSimulatedResult] = useState<Recipe | null>(null);
+  const [isPortable, setIsPortable] = useState(false);
 
   // States for the main Recipe Catalog filtering
   const [searchQuery, setSearchQuery] = useState("");
@@ -91,7 +168,11 @@ export default function App() {
     let sourceList: Recipe[] = RECIPES;
 
     if (onlyShowCookable) {
-      sourceList = getCookableRecipes(checkedIngredients);
+      const cookableSet = new Set(getCookableRecipes(checkedIngredients, isPortable).map(r => r.id));
+      sourceList = sourceList.filter(recipe => {
+        if (!isPortable && recipe.isPortable) return false;
+        return cookableSet.has(recipe.id) || isRecipeRelated(recipe, checkedIngredients);
+      });
     }
 
     // Apply category filter (meat-heavy, veg-heavy, high-sanity, summer-chill etc.)
@@ -139,7 +220,11 @@ export default function App() {
       const diff = valA - valB;
       return sortDirection === "desc" ? -diff : diff;
     });
-  }, [onlyShowCookable, checkedIngredients, searchQuery, sortBy, sortDirection, categoryFilter]);
+  }, [onlyShowCookable, checkedIngredients, searchQuery, sortBy, sortDirection, categoryFilter, isPortable]);
+
+  const cookableRecipeIds = useMemo(() => {
+    return new Set(getCookableRecipes(checkedIngredients, isPortable).map(r => r.id));
+  }, [checkedIngredients, isPortable]);
 
   // Handle checking/unchecking ingredient
   const toggleIngredientCheck = (id: string) => {
@@ -195,7 +280,7 @@ export default function App() {
       setCookingProgress((old) => {
         if (old >= 100) {
           clearInterval(interval);
-          const outcome = cookCrockPot(potSlots);
+          const outcome = cookCrockPot(potSlots, isPortable);
           setSimulatedResult(outcome);
           setIsCooking(false);
           return 100;
@@ -348,12 +433,6 @@ export default function App() {
                     >
                       清空所選
                     </button>
-                    <button
-                      onClick={() => setCheckedIngredients(["large_meat", "monster_meat", "berries", "ice", "twigs"])}
-                      className="flex-1 py-1 px-2 text-xs bg-red-950/40 hover:bg-red-900/30 text-rose-300 border border-red-900/40 rounded transition cursor-pointer"
-                    >
-                      經典推薦
-                    </button>
                   </div>
 
                   {/* Compact Grid of Category Block Tiles */}
@@ -446,7 +525,7 @@ export default function App() {
                                         : "bg-stone-900/40 text-stone-400 border-stone-850 hover:border-stone-750"
                                     }`}
                                   >
-                                    <span className="text-sm shrink-0">{ing.avatarText}</span>
+                                    <IngredientImage ingredientId={ing.id} avatarText={ing.avatarText} className="w-5 h-5 object-contain shrink-0" />
                                     <div className="text-left truncate flex-1 min-w-0">
                                       <div className="truncate font-medium">{ing.name}</div>
                                       <div className="text-[9px] text-stone-500 truncate mt-[-2px]">
@@ -504,7 +583,7 @@ export default function App() {
                         />
                         <div className="w-9 h-5 bg-stone-750 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-stone-300 after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600" />
                         <span className="ms-2 text-xs font-medium text-stone-300">
-                          僅顯示我能烹飪的食譜 ({getCookableRecipes(checkedIngredients).length})
+                          篩選手頭食材相關 ({getCookableRecipes(checkedIngredients, isPortable).length} 可做 / {RECIPES.filter(r => (!isPortable && r.isPortable) ? false : isRecipeRelated(r, checkedIngredients)).length} 相關)
                         </span>
                       </label>
                     </div>
@@ -627,39 +706,26 @@ export default function App() {
                       // Check if user currently has the "idealCombo" ingredients selected
                       const missingForIdeal = recipe.idealCombo.filter(id => !checkedIngredients.includes(id));
                       const isIdealCookable = missingForIdeal.length === 0;
+                      const isFullyCookable = cookableRecipeIds.has(recipe.id);
+                      const missingReqs = getMissingRequirements(recipe, checkedIngredients);
 
                       return (
                         <div
                           key={recipe.id}
-                          className="bg-stone-900 border border-stone-800 rounded-xl overflow-hidden hover:border-amber-900/50 transition-all duration-200 flex flex-col justify-between"
+                          className="bg-stone-900 border border-stone-700 rounded-xl overflow-hidden hover:border-amber-500/60 transition-all duration-200 flex flex-col justify-between"
                         >
                           {/* Top part */}
                           <div className="p-4">
                             <div className="flex items-start justify-between gap-2">
                               <div>
                                 <h3 className="text-sm font-bold text-stone-100 flex items-center gap-1.5">
-                                  <span className="text-xl">
-                                    {recipe.id === "mandrake_soup" ? "🍲" :
-                                     recipe.id === "waffles" ? "🧇" :
-                                     recipe.id === "surf_n_turf" ? "🍱" :
-                                     recipe.id === "ice_cream" ? "🍧" :
-                                     recipe.id === "pierogi" ? "🥟" :
-                                     recipe.id === "dragonpie" ? "🥮" :
-                                     recipe.id === "fishsticks" ? "🍤" :
-                                     recipe.id === "flower_salad" ? "🥗" :
-                                     recipe.id === "trail_mix" ? "🍒" :
-                                     recipe.id === "unagi" ? "🍣" :
-                                     recipe.id === "guacamole" ? "🦎" :
-                                     recipe.id === "bacon_and_eggs" ? "🍳" :
-                                     recipe.id === "butter_muffin" ? "🧁" :
-                                     recipe.id === "turkey_dinner" ? "🦃" :
-                                     recipe.id === "melonsicle" ? "🍉" :
-                                     recipe.id === "taffy" ? "🍬" :
-                                     recipe.id === "meaty_stew" ? "🥣" :
-                                     recipe.id === "meatballs" ? "🧆" : "🍛"
-                                    }
-                                  </span>
+                                  <RecipeImage recipeId={recipe.id} className="w-6 h-6 object-contain shrink-0" />
                                   {recipe.name}
+                                  {recipe.isPortable && (
+                                    <span className="ml-1.5 px-1.5 py-0.5 text-[8px] font-bold bg-purple-950/80 text-purple-300 border border-purple-900/40 rounded leading-none shrink-0">
+                                      Warly
+                                    </span>
+                                  )}
                                 </h3>
                                 <p className="text-[10px] text-stone-400 font-mono uppercase">
                                   {recipe.englishName} • 優先級: {recipe.priority}
@@ -702,30 +768,39 @@ export default function App() {
                                         }`}
                                         title={ing.name}
                                       >
-                                        <span>{ing.avatarText}</span>
+                                        <IngredientImage ingredientId={ing.id} avatarText={ing.avatarText} className="w-4 h-4 object-contain" />
                                         <span>{ing.name}</span>
                                       </span>
                                     );
                                   })}
 
-                                  {isIdealCookable ? (
-                                    <span className="text-[9px] text-emerald-500 ml-1">✓ 可製作</span>
+                                  {isFullyCookable ? (
+                                    <span className="text-[9px] text-emerald-500 ml-1 font-bold">✓ 可製作</span>
                                   ) : (
-                                    <span className="text-[9px] text-stone-500 ml-1 italic">(缺食材)</span>
+                                    <span className="text-[9px] text-amber-500 ml-1 font-bold">⚠️ 缺食材</span>
                                   )}
                                 </div>
                               </div>
+                              
+                              {!isFullyCookable && missingReqs.length > 0 && (
+                                <div className="mt-2 text-[10px] bg-amber-955/20 border border-amber-900/35 rounded-lg p-2 text-amber-300">
+                                  <span className="font-bold block text-amber-400 mb-0.5">💡 還需滿足以下屬性或食材之一：</span>
+                                  <ul className="list-disc list-inside space-y-0.5 font-mono">
+                                    {missingReqs.map((req, idx) => (
+                                      <li key={idx} className="leading-normal">{req}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
                             </div>
                           </div>
 
                           {/* Stats bottom bar */}
                           <div className="bg-stone-950/50 border-t border-stone-800/80 px-4 py-2.5 grid grid-cols-3 gap-2">
                             <div className="flex items-center gap-1">
-                              <div className="h-6 w-6 rounded bg-red-950/40 border border-red-900/30 flex items-center justify-center">
-                                <Heart className="h-3 w-3 text-red-500 fill-red-500" />
-                              </div>
+                              <StateIcon type="hp" className="w-5 h-5 object-contain shrink-0" />
                               <div className="leading-none">
-                                <div className="text-[9px] text-stone-400">生命值</div>
+                                <div className="text-[9px] text-stone-400">+血量</div>
                                 <div className={`text-xs font-bold font-mono ${recipe.hp >= 30 ? "text-rose-400" : recipe.hp < 0 ? "text-red-500" : "text-stone-300"}`}>
                                   {recipe.hp > 0 ? `+${recipe.hp}` : recipe.hp}
                                 </div>
@@ -733,11 +808,9 @@ export default function App() {
                             </div>
 
                             <div className="flex items-center gap-1">
-                              <div className="h-6 w-6 rounded bg-amber-950/40 border border-amber-900/30 flex items-center justify-center">
-                                <UtensilsCrossed className="h-3 w-3 text-amber-500" />
-                              </div>
+                              <StateIcon type="hunger" className="w-5 h-5 object-contain shrink-0" />
                               <div className="leading-none">
-                                <div className="text-[9px] text-stone-400">飢餓值</div>
+                                <div className="text-[9px] text-stone-400">+飢餓值</div>
                                 <div className={`text-xs font-bold font-mono ${recipe.hunger >= 75 ? "text-amber-400" : "text-stone-300"}`}>
                                   +{recipe.hunger}
                                 </div>
@@ -745,11 +818,9 @@ export default function App() {
                             </div>
 
                             <div className="flex items-center gap-1">
-                              <div className="h-6 w-6 rounded bg-sky-950/40 border border-sky-900/30 flex items-center justify-center">
-                                <Eye className="h-3 w-3 text-sky-400" />
-                              </div>
+                              <StateIcon type="sanity" className="w-5 h-5 object-contain shrink-0" />
                               <div className="leading-none">
-                                <div className="text-[9px] text-stone-400">精神值</div>
+                                <div className="text-[9px] text-stone-400">+san值</div>
                                 <div className={`text-xs font-bold font-mono ${recipe.sanity >= 20 ? "text-sky-300" : recipe.sanity < 0 ? "text-purple-400" : "text-stone-300"}`}>
                                   {recipe.sanity > 0 ? `+${recipe.sanity}` : recipe.sanity}
                                 </div>
@@ -848,7 +919,7 @@ export default function App() {
                             >
                               {ingId && ingredient ? (
                                 <div className="text-center">
-                                  <span className="text-xl">{ingredient.avatarText}</span>
+                                   <IngredientImage ingredientId={ingredient.id} avatarText={ingredient.avatarText} className="w-6 h-6 object-contain mx-auto" />
                                   <span className="text-[10px] block mt-0.5 font-bold truncate max-w-[50px]">{ingredient.name}</span>
                                 </div>
                               ) : (
@@ -866,6 +937,24 @@ export default function App() {
                           </div>
                         );
                       })}
+                    </div>
+
+                    {/* Warly Portable Pot Toggle */}
+                    <div className="flex items-center justify-between w-full bg-stone-950/60 p-2.5 rounded-xl border border-stone-850/85 mt-2">
+                      <label className="text-[11px] text-stone-350 flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isPortable}
+                          onChange={(e) => {
+                            setIsPortable(e.target.checked);
+                            setSimulatedResult(null);
+                          }}
+                          disabled={isCooking}
+                          className="rounded border-stone-800 text-amber-600 focus:ring-amber-500 bg-stone-900 h-3.5 w-3.5"
+                        />
+                        <span>使用 Warly 的可攜式烹飪鍋 (Portable Pot)</span>
+                      </label>
+                      <span className="text-[8px] px-1.5 py-0.5 bg-purple-950 text-purple-300 border border-purple-800 rounded font-mono font-bold">Warly</span>
                     </div>
 
                     {/* Simulation Controller utilities */}
@@ -936,29 +1025,17 @@ export default function App() {
 
                       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center bg-stone-950 p-4 rounded-xl mb-4 border border-stone-850">
                         <div className="h-16 w-16 rounded-xl bg-amber-500/10 border border-amber-500/20 text-3xl flex items-center justify-center shrink-0">
-                          {simulatedResult.id === "mandrake_soup" ? "🍲" :
-                           simulatedResult.id === "waffles" ? "🧇" :
-                           simulatedResult.id === "surf_n_turf" ? "🍱" :
-                           simulatedResult.id === "ice_cream" ? "🍧" :
-                           simulatedResult.id === "pierogi" ? "🥟" :
-                           simulatedResult.id === "dragonpie" ? "🥮" :
-                           simulatedResult.id === "fishsticks" ? "🍤" :
-                           simulatedResult.id === "flower_salad" ? "🥗" :
-                           simulatedResult.id === "trail_mix" ? "🍒" :
-                           simulatedResult.id === "unagi" ? "🍣" :
-                           simulatedResult.id === "guacamole" ? "🦎" :
-                           simulatedResult.id === "bacon_and_eggs" ? "🍳" :
-                           simulatedResult.id === "butter_muffin" ? "🧁" :
-                           simulatedResult.id === "turkey_dinner" ? "🦃" :
-                           simulatedResult.id === "melonsicle" ? "🍉" :
-                           simulatedResult.id === "taffy" ? "🍬" :
-                           simulatedResult.id === "meaty_stew" ? "🥣" :
-                           simulatedResult.id === "meatballs" ? "🧆" : "🍛"}
+                          <RecipeImage recipeId={simulatedResult.id} className="w-12 h-12 object-contain" />
                         </div>
 
                         <div>
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <h2 className="text-lg font-serif font-bold text-amber-400">{simulatedResult.name}</h2>
+                            {simulatedResult.isPortable && (
+                              <span className="px-1.5 py-0.5 text-[9px] font-bold bg-purple-950 text-purple-300 border border-purple-800 rounded leading-none">
+                                Warly 專屬
+                              </span>
+                            )}
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 font-mono">
                               優先級: {simulatedResult.priority}
                             </span>
@@ -971,25 +1048,25 @@ export default function App() {
                       {/* Display Restoration Values */}
                       <h4 className="text-xs text-stone-400 font-mono mb-2 uppercase tracking-wider">★ 料理食用恢復值：</h4>
                       <div className="grid grid-cols-3 gap-3 mb-4">
-                        <div className="bg-red-950/20 border border-red-900/30 p-3 rounded-xl text-center">
-                          <Heart className="h-5 w-5 text-red-500 fill-red-500 mx-auto mb-1" />
-                          <div className="text-[10px] text-stone-400 leading-none">生命值 HP</div>
+                        <div className="bg-red-950/20 border border-red-900/30 p-3 rounded-xl text-center flex flex-col items-center justify-center">
+                          <StateIcon type="hp" className="w-6 h-6 object-contain mb-1" />
+                          <div className="text-[10px] text-stone-400 leading-none">+血量</div>
                           <div className={`text-sm font-bold font-mono mt-1 ${simulatedResult.hp >= 30 ? "text-rose-400" : simulatedResult.hp < 0 ? "text-red-500" : "text-stone-200"}`}>
                             {simulatedResult.hp > 0 ? `+${simulatedResult.hp}` : simulatedResult.hp}
                           </div>
                         </div>
 
-                        <div className="bg-amber-955/20 border border-amber-900/30 p-3 rounded-xl text-center">
-                          <UtensilsCrossed className="h-5 w-5 text-amber-500 mx-auto mb-1" />
-                          <div className="text-[10px] text-stone-400 leading-none">飢餓值 Hunger</div>
+                        <div className="bg-amber-955/20 border border-amber-900/30 p-3 rounded-xl text-center flex flex-col items-center justify-center">
+                          <StateIcon type="hunger" className="w-6 h-6 object-contain mb-1" />
+                          <div className="text-[10px] text-stone-400 leading-none">+飢餓值</div>
                           <div className={`text-sm font-bold font-mono mt-1 ${simulatedResult.hunger >= 75 ? "text-amber-400" : "text-stone-200"}`}>
                             +{simulatedResult.hunger}
                           </div>
                         </div>
 
-                        <div className="bg-sky-950/20 border border-sky-900/30 p-3 rounded-xl text-center">
-                          <Eye className="h-5 w-5 text-sky-450 mx-auto mb-1" />
-                          <div className="text-[10px] text-stone-400 leading-none">精神值 Sanity</div>
+                        <div className="bg-sky-950/20 border border-sky-900/30 p-3 rounded-xl text-center flex flex-col items-center justify-center">
+                          <StateIcon type="sanity" className="w-6 h-6 object-contain mb-1" />
+                          <div className="text-[10px] text-stone-400 leading-none">+san值</div>
                           <div className={`text-sm font-bold font-mono mt-1 ${simulatedResult.sanity >= 20 ? "text-sky-300" : simulatedResult.sanity < 0 ? "text-purple-400" : "text-stone-200"}`}>
                             {simulatedResult.sanity > 0 ? `+${simulatedResult.sanity}` : simulatedResult.sanity}
                           </div>
@@ -1026,19 +1103,19 @@ export default function App() {
                         <p className="text-[11px] text-stone-400">💡 經典食譜快速入口 preset：</p>
                         <div className="flex flex-wrap items-center justify-center gap-1.5 mt-2">
                           <button
-                            onClick={() => loadPresetIntoPot(["monster_meat", "berries", "berries", "berries"])}
+                            onClick={() => loadPresetIntoPot(["monstermeat", "berries", "berries", "berries"])}
                             className="bg-stone-950 hover:bg-stone-800 border border-stone-800 text-stone-300 px-2 py-1 rounded text-[10px] transition cursor-pointer"
                           >
                             肉丸 🧆
                           </button>
                           <button
-                            onClick={() => loadPresetIntoPot(["monster_meat", "egg", "carrot", "berries"])}
+                            onClick={() => loadPresetIntoPot(["monstermeat", "bird_egg", "carrot", "berries"])}
                             className="bg-stone-950 hover:bg-stone-800 border border-stone-800 text-stone-300 px-2 py-1 rounded text-[10px] transition cursor-pointer"
                           >
                             餃子 🥟
                           </button>
                           <button
-                            onClick={() => loadPresetIntoPot(["large_meat", "large_meat", "morsel", "morsel"])}
+                            onClick={() => loadPresetIntoPot(["meat", "meat", "smallmeat", "smallmeat"])}
                             className="bg-stone-950 hover:bg-stone-800 border border-stone-800 text-stone-300 px-2 py-1 rounded text-[10px] transition cursor-pointer"
                           >
                             肉湯 🥣
@@ -1050,7 +1127,7 @@ export default function App() {
                             火龍果派 🥮
                           </button>
                           <button
-                            onClick={() => loadPresetIntoPot(["electric_milk", "ice", "honey", "honey"])}
+                            onClick={() => loadPresetIntoPot(["goatmilk", "ice", "honey", "honey"])}
                             className="bg-stone-950 hover:bg-stone-800 border border-stone-800 text-stone-300 px-2 py-1 rounded text-[10px] transition cursor-pointer"
                           >
                             冰淇淋 🍧
@@ -1117,7 +1194,7 @@ export default function App() {
                                         }`}
                                       >
                                         <span className="flex items-center gap-1 text-left truncate flex-1 min-w-0">
-                                          <span className="text-sm shrink-0">{ing.avatarText}</span>
+                                           <IngredientImage ingredientId={ing.id} avatarText={ing.avatarText} className="w-5 h-5 object-contain shrink-0" />
                                           <span className="truncate">{ing.name}</span>
                                         </span>
                                         
@@ -1147,16 +1224,6 @@ export default function App() {
           )}
         </AnimatePresence>
       </main>
-
-      {/* Styled Footer */}
-      <footer className="border-t border-stone-850 bg-stone-950 py-8 px-4 text-center mt-12" id="footer-panel">
-        <p className="text-xs text-stone-500">
-          *聲明：配方與烹飪優先級理論採用《Don't Starve Together》官方版配比。
-        </p>
-        <p className="text-[11px] text-amber-600/60 mt-1 font-serif">
-          飢荒食譜神級計算器 • 專為中國玩家量身定制
-        </p>
-      </footer>
     </div>
   );
 }
