@@ -35,35 +35,70 @@ import {
   getMissingRequirements,
 } from "./recipesData";
 
+const SPECIAL_INGREDIENTS = [
+  { id: "mandrake", names: ["曼德拉草", "mandrake"] },
+  { id: "royal_jelly", names: ["蜂王漿", "royal jelly"] },
+  { id: "butter", names: ["黃油", "butter"] },
+  { id: "wobster_sheller_land", names: ["龍蝦", "wobster"] },
+  { id: "lightninggoathorn", names: ["伏特羊角", "volt goat horn"] },
+  { id: "dragonfruit", names: ["火龍果", "dragon fruit"] },
+  { id: "cactus_flower", names: ["仙人掌花", "cactus flower"] },
+  { id: "trunk_summer", names: ["象鼻", "koalefant trunk"] },
+  { id: "trunk_winter", names: ["冬象鼻", "winter koalefant trunk"] },
+  { id: "plantmeat", names: ["葉肉", "leafy meat"] },
+  { id: "forgetmelots", names: ["必忘我", "forget-me-lots"] },
+  { id: "wormlight", names: ["發光漿果", "glow berry"] },
+  { id: "refined_dust", names: ["塵埃", "collected dust"] },
+  { id: "nightmarefuel", names: ["噩夢燃料", "nightmare fuel"] },
+  { id: "boneshard", names: ["骨頭碎片", "bone shards"] },
+  { id: "batnose", names: ["裸露鼻孔", "batnose"] }
+];
+
+function isStronglyBoundTo(recipe: Recipe, ingredientId: string): boolean {
+  const reqLower = (recipe.requirementsEN || "").toLowerCase();
+  const idToTerms: Record<string, string[]> = {
+    mandrake: ["mandrake"],
+    royal_jelly: ["royal jelly"],
+    butter: ["butter"],
+    wobster_sheller_land: ["wobster"],
+    lightninggoathorn: ["volt goat horn", "goat horn"],
+    dragonfruit: ["dragon fruit"],
+    cactus_flower: ["cactus flower"],
+    trunk_summer: ["koalefant trunk", "trunk"],
+    trunk_winter: ["koalefant trunk", "trunk"],
+    plantmeat: ["leafy meat"],
+    forgetmelots: ["forget-me-lots"],
+    wormlight: ["glow berry", "lesser glow berry"],
+    refined_dust: ["collected dust"],
+    nightmarefuel: ["nightmare fuel"],
+    boneshard: ["bone shards", "bone shard"],
+    batnose: ["batnose"]
+  };
+
+  const terms = idToTerms[ingredientId];
+  if (!terms) return false;
+  return terms.some(term => reqLower.includes(term));
+}
+
+
 export function getRecipeEmoji(id: string): string {
   const emojiMap: Record<string, string> = {
-    mandrake_soup: "🍲",
     mandrakesoup: "🍲",
     waffles: "🧇",
-    surf_n_turf: "🍱",
     surfnturf: "🍱",
-    ice_cream: "🍧",
     icecream: "🍧",
-    pierogi: "🥟",
     perogies: "🥟",
     dragonpie: "🥮",
     fishsticks: "🍤",
-    flower_salad: "🥗",
     flowersalad: "🥗",
-    trail_mix: "🍒",
     trailmix: "🍒",
     unagi: "🍣",
     guacamole: "🦎",
-    bacon_and_eggs: "🍳",
     baconeggs: "🍳",
-    butter_muffin: "🧁",
     butterflymuffin: "🧁",
-    turkey_dinner: "🦃",
     turkeydinner: "🦃",
-    melonsicle: "🍉",
     watermelonicle: "🍉",
     taffy: "🍬",
-    meaty_stew: "🥣",
     bonestew: "🥣",
     meatballs: "🧆"
   };
@@ -162,12 +197,53 @@ export default function App() {
   const [onlyShowCookable, setOnlyShowCookable] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
+  // Auto-enable "onlyShowCookable" when user starts selecting ingredients, disable when empty
+  useEffect(() => {
+    if (checkedIngredients.length > 0) {
+      setOnlyShowCookable(true);
+    } else {
+      setOnlyShowCookable(false);
+    }
+  }, [checkedIngredients.length > 0]);
+
+
+  // Identify active special ingredients based on checklist or search query
+  const activeSpecialIngredients = useMemo(() => {
+    const activeIds = new Set<string>();
+    
+    // 1. From checked ingredients
+    SPECIAL_INGREDIENTS.forEach(sp => {
+      if (checkedIngredients.includes(sp.id)) {
+        activeIds.add(sp.id);
+      }
+      if (sp.id === "trunk_summer" && (checkedIngredients.includes("trunk_winter") || checkedIngredients.includes("trunk_cooked"))) {
+        activeIds.add("trunk_summer");
+      }
+      if (sp.id === "plantmeat" && checkedIngredients.includes("plantmeat_cooked")) {
+        activeIds.add("plantmeat");
+      }
+    });
+
+    // 2. From search query
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      SPECIAL_INGREDIENTS.forEach(sp => {
+        const matchesQuery = sp.names.some(name => q.includes(name) || name.includes(q));
+        if (matchesQuery) {
+          activeIds.add(sp.id);
+        }
+      });
+    }
+
+    return activeIds;
+  }, [checkedIngredients, searchQuery]);
+
   // Filter recipes based on checklist, categories, search, and sort
   const filteredRecipes = useMemo(() => {
     // Determine the list of search-space recipes
     let sourceList: Recipe[] = RECIPES;
 
-    if (onlyShowCookable) {
+    if (onlyShowCookable && checkedIngredients.length > 0) {
       const cookableSet = new Set(getCookableRecipes(checkedIngredients, isPortable).map(r => r.id));
       sourceList = sourceList.filter(recipe => {
         if (!isPortable && recipe.isPortable) return false;
@@ -198,8 +274,18 @@ export default function App() {
       );
     }
 
+    const isSpecialRecipe = (recipe: Recipe) => {
+      return Array.from(activeSpecialIngredients).some(spId => isStronglyBoundTo(recipe, spId as string));
+    };
+
     // Sort
     return [...sourceList].sort((a, b) => {
+      const aSpecial = isSpecialRecipe(a);
+      const bSpecial = isSpecialRecipe(b);
+
+      if (aSpecial && !bSpecial) return -1;
+      if (!aSpecial && bSpecial) return 1;
+
       let valA = 0;
       let valB = 0;
 
@@ -220,7 +306,8 @@ export default function App() {
       const diff = valA - valB;
       return sortDirection === "desc" ? -diff : diff;
     });
-  }, [onlyShowCookable, checkedIngredients, searchQuery, sortBy, sortDirection, categoryFilter, isPortable]);
+  }, [onlyShowCookable, checkedIngredients, searchQuery, sortBy, sortDirection, categoryFilter, isPortable, activeSpecialIngredients]);
+
 
   const cookableRecipeIds = useMemo(() => {
     return new Set(getCookableRecipes(checkedIngredients, isPortable).map(r => r.id));
@@ -395,11 +482,8 @@ export default function App() {
               />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-mono text-stone-400">Ver 1.0.3</span>
-              </div>
               <h1 className="text-lg sm:text-xl font-bold font-serif text-white tracking-wide mt-0.5">
-                飢荒神級砂鍋食譜模擬器
+                東方靈飢荒百科
               </h1>
             </div>
           </div>
@@ -741,14 +825,18 @@ export default function App() {
                     {filteredRecipes.map((recipe) => {
                       // Check if user currently has the "idealCombo" ingredients selected
                       const missingForIdeal = recipe.idealCombo.filter(id => !checkedIngredients.includes(id));
-                      const isIdealCookable = missingForIdeal.length === 0;
                       const isFullyCookable = cookableRecipeIds.has(recipe.id);
                       const missingReqs = getMissingRequirements(recipe, checkedIngredients);
+                      const isSpecial = Array.from(activeSpecialIngredients).some(spId => isStronglyBoundTo(recipe, spId as string));
 
                       return (
                         <div
                           key={recipe.id}
-                          className="bg-stone-900 border border-stone-700 rounded-xl overflow-hidden hover:border-amber-500/60 transition-all duration-200 flex flex-col justify-between"
+                          className={`bg-stone-900 border rounded-xl overflow-hidden hover:border-amber-500/60 transition-all duration-200 flex flex-col justify-between ${
+                            isSpecial
+                              ? "border-amber-500 shadow-lg shadow-amber-500/15 ring-1 ring-amber-500/30 animate-dst-glow"
+                              : "border-stone-700"
+                          }`}
                         >
                           {/* Top part */}
                           <div className="p-4">
@@ -757,6 +845,11 @@ export default function App() {
                                 <h3 className="text-sm font-bold text-stone-100 flex items-center gap-1.5">
                                   <RecipeImage recipeId={recipe.id} className="w-6 h-6 object-contain shrink-0" />
                                   {recipe.name}
+                                  {isSpecial && (
+                                    <span className="px-1.5 py-0.5 text-[8px] font-bold bg-amber-500 text-stone-950 rounded flex items-center gap-0.5 leading-none shrink-0 shadow-sm animate-pulse">
+                                      ⭐ 特殊料理
+                                    </span>
+                                  )}
                                   {recipe.isPortable && (
                                     <span className="ml-1.5 px-1.5 py-0.5 text-[8px] font-bold bg-purple-950/80 text-purple-300 border border-purple-900/40 rounded leading-none shrink-0">
                                       Warly
@@ -773,6 +866,7 @@ export default function App() {
                                 <span>煮:{recipe.cookTime}s • 爛:{recipe.perishDays}天</span>
                               </div>
                             </div>
+
 
                             <p className="text-xs text-stone-300 mt-2 line-clamp-2 leading-relaxed bg-stone-950/20 p-2 rounded border border-stone-850">
                               {recipe.description}

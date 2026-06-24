@@ -22,6 +22,7 @@ export interface CookingRecipe {
   teashopLevels?: [number, number, number];
   /** Optional finalized buff description (i18n key) — used for teashop teas to describe the timed buff. */
   buffEffectKey?: string;
+  description?: string;
 }
 
 export const cookingRecipes: CookingRecipe[] = [
@@ -46,6 +47,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "baconeggs",
+    description: "高飽腹（75）、保質期極長（20天）的優質出遠門口糧，但會消耗較多肉與蛋。",
     name: "Bacon and Eggs",
     requirements: "Egg > 1, Meat > 1, No Veggie",
     foodType: "meat",
@@ -174,6 +176,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "bonestew",
+    description: "飢餓值大魔王（+150）！一鍋下去大部分角色能直接吃撐。注意不能有樹枝，否則會變肉串甚至是濕滑焦糊。",
     name: "Meaty Stew",
     requirements: "Meat ≥ 3, No Inedible",
     foodType: "meat",
@@ -204,6 +207,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "butterflymuffin",
+    description: "綠地探險與前期保命不可多得的美味（回血20），僅需拍扁一條蝴蝶加根胡蘿蔔!",
     name: "Butter Muffin",
     requirements: "Butterfly Wings ×1, No Meat, Veggie ≥ 0.5",
     foodType: "veggie",
@@ -248,6 +252,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "dragonpie",
+    description: "素食玩家與中後期基地的必備至尊！一個火龍果加上三個樹枝就能做出來（極致省料）。",
     name: "Dragonpie",
     requirements: "Dragon Fruit ×1, No Meat",
     foodType: "veggie",
@@ -295,6 +300,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "fishsticks",
+    description: "池塘垂釣愛好者的回血神物（高達+40血），做法簡單，加一根樹枝即可成型。",
     name: "Fishsticks",
     requirements: "Fish, Twigs ×1, Inedible ≤ 1",
     foodType: "meat",
@@ -325,6 +331,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "flowersalad",
+    description: "夏季限定高回血料理（+40），仙人掌開花時的絕佳美味，素食玩家首選。",
     name: "Flower Salad",
     requirements: "Cactus Flower ×1, Veggie ≥ 2, No Meat, No Inedible, No Egg, No Sweetener, No Fruit",
     foodType: "veggie",
@@ -401,6 +408,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "guacamole",
+    description: "風味獨特，能稍微回復精神。捕捉一隻肥碩的鼴鼠放入砂鍋中敲暈製作！",
     name: "Guacamole",
     requirements: "Moleworm ×1, Ripe Stone Fruit / Cactus Flesh ×1, No Fruit",
     foodType: "meat",
@@ -463,6 +471,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "icecream",
+    description: "精神回復之王（+50）！夏日降溫神物，但保存期限非常短暫，建議現做現吃。",
     name: "Ice Cream",
     requirements: "Frozen, Dairy, Sweetener, No Meat, No Veggie, No Inedible, No Egg",
     foodType: "goodies",
@@ -479,6 +488,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "jammypreserves",
+    description: "簡單極致的水果甜食，沒有肉菜時可以烹飪用於前期飽腹。",
     name: "Fist Full of Jam",
     requirements: "Fruit, No Meat, No Veggie, No Inedible",
     foodType: "veggie",
@@ -521,6 +531,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "kabobs",
+    description: "最便宜的烤肉串！可以用樹枝作為烤籤與多餘的肉屑來烹飪。",
     name: "Kabobs",
     requirements: "Meat, Twigs ×1, Monster ≤ 1, Inedible ≤ 1",
     foodType: "meat",
@@ -619,6 +630,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "mandrakesoup",
+    description: "大補品！能夠回復極大量的生命值 and 飢餓值，一喝下去瞬間拉滿！",
     name: "Mandrake Soup",
     requirements: "Mandrake ×1",
     foodType: "veggie",
@@ -647,6 +659,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "meatballs",
+    description: "飢荒新手老手的大眾常客，俗稱「萬能飽腹神丸」。放一塊怪物肉與三個漿果，高達 62.5 飢餓值回復！",
     name: "Meatballs",
     requirements: "Meat, No Inedible",
     foodType: "meat",
@@ -675,6 +688,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "monsterlasagna",
+    description: "極其致命的紫紅色千層麵，正常角色吃下會大幅流失生命與神智。只有韋伯（Webber）可以免疫其副作用！",
     name: "Monster Lasagna",
     requirements: "Monster ≥ 2, No Inedible",
     foodType: "meat",
@@ -704,6 +718,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "perogies",
+    description: "飢荒「性價比最高」的打怪戰鬥回血神藥。保存時間極長（20天），材料極易取得！",
     name: "Pierogi",
     requirements: "Egg, Meat, Veggie ≥ 0.5, No Inedible",
     foodType: "meat",
@@ -760,6 +775,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "ratatouille",
+    description: "清淡健康的素食小餐，蔬菜溢出時可以作為保溫素食。",
     name: "Ratatouille",
     requirements: "No Meat, Veggie ≥ 0.5, No Inedible",
     foodType: "veggie",
@@ -844,6 +860,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "surfnturf",
+    description: "超級出色的中後期料理，高額回復生命值與精神值。在船難或聯機版地洞垂釣中極受歡迎！",
     name: "Surf 'n' Turf",
     requirements: "Meat ≥ 2.5, Fish ≥ 1.5, No Frozen",
     foodType: "meat",
@@ -876,6 +893,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "taffy",
+    description: "前期性價比極高的回腦（精神+15）料理，但也因為太甜會微幅扣減生命 3 點。",
     name: "Taffy",
     requirements: "Sweetener ≥ 3, No Meat",
     foodType: "goodies",
@@ -903,6 +921,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "trailmix",
+    description: "秋季砍樺樹最愛的保命零食，回血 30 性價比突出。注意原材料必須是「烤過」的樹果！",
     name: "Trail Mix",
     requirements: "Acorn ×1, Seed ≥ 1, Berries ×1, Fruit ≥ 1, No Meat, No Veggie, No Egg, No Dairy",
     foodType: "veggie",
@@ -917,6 +936,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "turkeydinner",
+    description: "飽腹感拉滿的美味派對火雞！也是對付騷擾灌木叢火雞的香噴噴報復餐。",
     name: "Turkey Dinner",
     requirements: "Drumstick ×2, Meat > 1, Veggie ≥ 0.5 or Fruit",
     foodType: "meat",
@@ -934,6 +954,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "unagi",
+    description: "地洞深處釣鰻魚者的常規點心，烹飪迅速，屬快遞料理。",
     name: "Unagi",
     requirements: "Lichen / Kelp ×1, Eel ×1",
     foodType: "meat",
@@ -975,6 +996,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "waffles",
+    description: "高檔奢華甜食！需要極為罕見的黃油（擊殺蝴蝶 2% 機率獲得）。生命值恢復量僅次於曼德拉草湯！",
     name: "Waffles",
     requirements: "Butter ×1, Berries ×1, Egg",
     foodType: "veggie",
@@ -989,6 +1011,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "watermelonicle",
+    description: "精神回復利器 (+20 三分)。夏日解暑必備，自帶降溫效果，非常消暑。",
     name: "Melonsicle",
     requirements: "Watermelon ×1, Frozen, Twigs ×1, No Meat, No Veggie, No Egg",
     foodType: "veggie",
@@ -1005,6 +1028,7 @@ export const cookingRecipes: CookingRecipe[] = [
   },
   {
     id: "wetgoop",
+    description: "烹飪災難！浪費了精力與食材後得到的一坨無法下嚥的焦黑糊糊。",
     name: "Wet Goop",
     requirements: "Anything (default)",
     foodType: "generic",

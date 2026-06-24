@@ -1,41 +1,11 @@
 import { Ingredient, Recipe } from "./data/types";
 import { INGREDIENTS, INGREDIENT_MAP } from "./data/ingredients";
 import { cookingRecipes } from "./data/recipes";
-import { RECIPES as existingRecipes } from "./data/recipes_old";
 
 export type { Ingredient, Recipe };
 export { INGREDIENTS, INGREDIENT_MAP };
 
 // Map from new ID to old ID for the 23 original recipes
-const newToOldIdMap: Record<string, string> = {
-  "mandrakesoup": "mandrake_soup",
-  "waffles": "waffles",
-  "surfnturf": "surf_n_turf",
-  "icecream": "ice_cream",
-  "perogies": "pierogi",
-  "dragonpie": "dragonpie",
-  "fishsticks": "fishsticks",
-  "flowersalad": "flower_salad",
-  "trailmix": "trail_mix",
-  "unagi": "unagi",
-  "guacamole": "guacamole",
-  "butterflymuffin": "butter_muffin",
-  "turkeydinner": "turkey_dinner",
-  "baconeggs": "bacon_and_eggs",
-  "watermelonicle": "melonsicle",
-  "taffy": "taffy",
-  "bonestew": "meaty_stew",
-  "meatballs": "meatballs",
-  "jammypreserves": "fist_full_of_jam",
-  "ratatouille": "ratatouille",
-  "kabobs": "kabobs",
-  "monsterlasagna": "monster_lagasna", // map monsterlasagna to monster_lasagna (typo correction in map)
-  "wetgoop": "wet_goop"
-};
-
-// Handle typo in newToOldIdMap
-newToOldIdMap["monsterlasagna"] = "monster_lasagna";
-
 const recipeNameTranslations: Record<string, string> = {
   "Amberosia": "琥珀美食",
   "Asparagazpacho": "蘆筍冷湯",
@@ -585,14 +555,8 @@ const validCookingRecipes = cookingRecipes.filter(
 );
 
 for (const raw of validCookingRecipes) {
-  // Map raw ID to old ID if it's one of the 23 original recipes
-  const targetId = newToOldIdMap[raw.id] || raw.id;
-
-  // Check if we have an existing hand-crafted recipe to preserve descriptions and canCookWith functions
-  const existing = existingRecipes.find(r => r.id === targetId);
-
   const tcName = recipeNameTranslations[raw.name] || raw.name;
-  const canCookWith = existing ? existing.canCookWith : parseRequirements(raw.requirements);
+  const canCookWith = parseRequirements(raw.requirements);
 
   // Expand idealCombo from cardIngredients
   const idealCombo: string[] = [];
@@ -609,7 +573,7 @@ for (const raw of validCookingRecipes) {
   }
 
   const recipe: Recipe = {
-    id: targetId,
+    id: raw.id,
     name: tcName,
     englishName: raw.name,
     hp: raw.health,
@@ -621,8 +585,8 @@ for (const raw of validCookingRecipes) {
     requirementsZH: translateRequirementsToZH(raw.requirements),
     requirementsEN: raw.requirements,
     canCookWith: canCookWith,
-    idealCombo: existing ? existing.idealCombo : idealCombo.slice(0, 4),
-    description: existing ? existing.description : `《DST》官方食譜中的經典烹飪菜餚，優先度為 ${raw.priority}。`,
+    idealCombo: idealCombo.slice(0, 4),
+    description: raw.description || `《DST》官方食譜中的經典烹飪菜餚，優先度為 ${raw.priority}。`,
     isPortable: raw.station === "portablecookpot"
   };
 

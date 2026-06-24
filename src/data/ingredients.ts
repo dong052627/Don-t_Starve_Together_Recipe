@@ -861,7 +861,7 @@ export const INGREDIENTS: Ingredient[] = [
   },
   {
     "id": "foliage_dried",
-    "name": "幹蕨葉",
+    "name": "乾蕨葉",
     "englishName": "Dried Foliage",
     "category": "special",
     "values": {
@@ -1478,17 +1478,6 @@ export const INGREDIENTS: Ingredient[] = [
     },
     "color": "bg-yellow-50 hover:bg-yellow-100 text-stone-900 border-yellow-300",
     "avatarText": "🍳"
-  },
-  {
-    "id": "forgetmelots_dried",
-    "name": "乾必忘我",
-    "englishName": "Dried Forget-Me-Lots",
-    "category": "special",
-    "values": {
-      "butterfly": 1
-    },
-    "color": "bg-stone-500 hover:bg-stone-600 text-white border-stone-700",
-    "avatarText": "🍖"
   },
   {
     "id": "seeds",
