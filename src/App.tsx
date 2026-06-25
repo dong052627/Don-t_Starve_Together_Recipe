@@ -217,6 +217,7 @@ export default function App() {
   // Character Encyclopedia States
   const [activeCharacterId, setActiveCharacterId] = useState<string>("wx78");
   const [wxCircuits, setWxCircuits] = useState<string[]>([]);
+  const [showCircuitSuggestions, setShowCircuitSuggestions] = useState<boolean>(false);
   const [expandedCircuitIds, setExpandedCircuitIds] = useState<
     Record<string, boolean>
   >({});
@@ -235,10 +236,10 @@ export default function App() {
     "wx78_deliverydrone_1",
     "wx78_deliverydrone_2",
     "wx78_extradronerange",
-    "wx78_allegiance_lunar",
+    "wx78_allegiance_shadow",
   ]);
-  const [celestialDefeated, setCelestialDefeated] = useState<boolean>(true);
-  const [shadowDefeated, setShadowDefeated] = useState<boolean>(false);
+  const [celestialDefeated, setCelestialDefeated] = useState<boolean>(false);
+  const [shadowDefeated, setShadowDefeated] = useState<boolean>(true);
 
   const currentCharacter = useMemo(() => {
     return CHARACTERS.find((c) => c.id === activeCharacterId) || CHARACTERS[0];
@@ -300,12 +301,12 @@ export default function App() {
         else if (skillId === "wx78_zapdrone_1") valid = true;
         else if (skillId === "wx78_zapdrone_2") valid = current.includes("wx78_zapdrone_1");
         else if (skillId === "wx78_allegiance_lunar") {
-          const maxbodies = current.includes("wx78_extrabody_2") || current.includes("wx78_extrabody_3");
+          const maxbodies = current.includes("wx78_extrabody_1");
           const noShadow = !current.includes("wx78_allegiance_shadow");
           valid = maxbodies && noShadow && celDefeated;
         }
         else if (skillId === "wx78_allegiance_shadow") {
-          const maxbodies = current.includes("wx78_extrabody_2") || current.includes("wx78_extrabody_3");
+          const maxbodies = current.includes("wx78_extrabody_1");
           const noLunar = !current.includes("wx78_allegiance_lunar");
           valid = maxbodies && noLunar && shaDefeated;
         }
@@ -335,14 +336,14 @@ export default function App() {
     // Check locks
     if (skillId === "wx78_allegiance_lunar") {
       const lockSatisfied =
-        (activeList.includes("wx78_extrabody_2") || activeList.includes("wx78_extrabody_3")) &&
+        activeList.includes("wx78_extrabody_1") &&
         !activeList.includes("wx78_allegiance_shadow") &&
         celDefeated;
       return lockSatisfied;
     }
     if (skillId === "wx78_allegiance_shadow") {
       const lockSatisfied =
-        (activeList.includes("wx78_extrabody_2") || activeList.includes("wx78_extrabody_3")) &&
+        activeList.includes("wx78_extrabody_1") &&
         !activeList.includes("wx78_allegiance_lunar") &&
         shaDefeated;
       return lockSatisfied;
@@ -2643,7 +2644,7 @@ export default function App() {
                               const y2 = p2.y;
 
                               const isLockOpen =
-                                (wxSkills.includes("wx78_extrabody_2") || wxSkills.includes("wx78_extrabody_3")) &&
+                                wxSkills.includes("wx78_extrabody_1") &&
                                 (lockId === "wx78_allegiance_lunar_lock_1" ? !wxSkills.includes("wx78_allegiance_shadow") && celestialDefeated : !wxSkills.includes("wx78_allegiance_lunar") && shadowDefeated);
 
                               const isSkillActive = wxSkills.includes(node.id);
@@ -2677,30 +2678,29 @@ export default function App() {
                             });
                           })}
 
-                          {/* Draw line from extrabody_3 to locks */}
+                          {/* Draw line from extrabody_1 to locks */}
                           {["wx78_allegiance_lunar_lock_1", "wx78_shadow_allegiance_lock_1"].map(lockId => {
                             const lockNode = (WX78_SKILL_TREE as any)[lockId];
-                            const extrabody3 = (WX78_SKILL_TREE as any)["wx78_extrabody_3"];
-                            if (!lockNode || !extrabody3) return null;
+                            const extrabody1 = (WX78_SKILL_TREE as any)["wx78_extrabody_1"];
+                            if (!lockNode || !extrabody1) return null;
 
-                            const p1 = getNodePosPct(extrabody3.pos);
+                            const p1 = getNodePosPct(extrabody1.pos);
                             const p2 = getNodePosPct(lockNode.pos);
                             const x1 = p1.x;
                             const y1 = p1.y;
                             const x2 = p2.x;
                             const y2 = p2.y;
 
-                            const isExtrabody3Active = wxSkills.includes("wx78_extrabody_3");
-                            const isExtrabody2Active = wxSkills.includes("wx78_extrabody_2");
+                            const isExtrabody1Active = wxSkills.includes("wx78_extrabody_1");
                             const isLockOpen =
-                              (isExtrabody2Active || isExtrabody3Active) &&
+                              isExtrabody1Active &&
                               (lockId === "wx78_allegiance_lunar_lock_1" ? !wxSkills.includes("wx78_allegiance_shadow") && celestialDefeated : !wxSkills.includes("wx78_allegiance_lunar") && shadowDefeated);
 
                             let strokeColor = "#1c1917"; // stone-900
                             let strokeWidth = "1";
                             let strokeDash = "2,2";
 
-                            if (isLockOpen && (isExtrabody2Active || isExtrabody3Active)) {
+                            if (isLockOpen && isExtrabody1Active) {
                               strokeColor = "#059669"; // emerald-600
                               strokeWidth = "1.5";
                               strokeDash = undefined;
@@ -2731,7 +2731,7 @@ export default function App() {
                           const isActive = wxSkills.includes(node.id);
 
                           if (node.isLock) {
-                            const maxbodiesActive = wxSkills.includes("wx78_extrabody_2") || wxSkills.includes("wx78_extrabody_3");
+                            const maxbodiesActive = wxSkills.includes("wx78_extrabody_1");
                             const isLunar = node.id === "wx78_allegiance_lunar_lock_1";
                             const noOpposingAlliance = isLunar ? !wxSkills.includes("wx78_allegiance_shadow") : !wxSkills.includes("wx78_allegiance_lunar");
                             const bossDefeated = isLunar ? celestialDefeated : shadowDefeated;
@@ -3280,6 +3280,17 @@ export default function App() {
                         className="px-3 py-1.5 text-xs bg-stone-850 hover:bg-stone-800 border border-stone-700 hover:border-amber-500/50 rounded-lg text-amber-300 transition cursor-pointer font-bold"
                       >
                         夏季 ☀️
+                      </button>
+                    </div>
+
+                    {/* Beginner Circuit Suggestions Button */}
+                    <div className="mb-4 flex flex-wrap gap-2 items-center">
+                      <button
+                        onClick={() => setShowCircuitSuggestions(true)}
+                        className="px-3.5 py-2 text-xs bg-amber-600 hover:bg-amber-500 border border-amber-600 hover:border-amber-500 rounded-lg text-stone-950 font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-amber-950/20 active:scale-95 duration-200"
+                      >
+                        <BookOpen className="h-3.5 w-3.5" />
+                        新手電路獲取建議 💡
                       </button>
                     </div>
 
@@ -3945,6 +3956,173 @@ export default function App() {
           )}
         </AnimatePresence>
       </main>
+
+      {/* Beginner Circuit Suggestions Modal */}
+      <AnimatePresence>
+        {showCircuitSuggestions && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+            onClick={() => setShowCircuitSuggestions(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="bg-stone-900 border border-stone-850 w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl max-h-[85vh] flex flex-col font-sans text-left"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 border-b border-stone-850 bg-stone-950/40">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-5 w-5 text-amber-500" />
+                  <span className="font-serif font-bold text-lg text-white">
+                    新手電路獲取建議
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowCircuitSuggestions(false)}
+                  className="text-stone-400 hover:text-white transition text-xl font-bold px-2 py-1 cursor-pointer"
+                >
+                  &times;
+                </button>
+              </div>
+
+              {/* Scrollable Content */}
+              <div className="p-6 overflow-y-auto space-y-6 text-stone-300 text-sm">
+                
+                {/* 遠古順序 */}
+                <div>
+                  <h3 className="text-sm font-serif font-bold text-amber-500 mb-3 pb-1 border-b border-stone-850 flex items-center gap-1.5">
+                    <Sparkles className="h-4 w-4 text-amber-500" />
+                    遠古順序 (推薦獲取流程)
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      { target: "蝶", scan: "蝴蝶、月蛾", desc: "處理器電路 (增加理智上限)", icon: <CircuitImage circuitId="alpha_sanity_1" className="w-16 h-16 object-contain" />, creatureImg: "butterfly.png" },
+                      { target: "兔子", scan: "兔子", desc: "加速電路 (增加移動速度)", icon: <CircuitImage circuitId="beta_speed_1" className="w-16 h-16 object-contain" />, creatureImg: "rabbit.png" },
+                      { target: "挖墳墓san歸零影怪", scan: "爬行恐懼、爬行夢魘、恐怖尖喙、夢魘尖喙、恐怖利爪、潛伏夢魘", desc: "超級處理器電路 (增加高額理智與理智恢復)", icon: <CircuitImage circuitId="alpha_sanity_2" className="w-16 h-16 object-contain" />, creatureImg: "shadow.png" },
+                      { target: "蜘蛛腺體", scan: "蜘蛛", desc: "強化電路 (增加生命上限)", icon: <CircuitImage circuitId="alpha_health_1" className="w-16 h-16 object-contain" />, creatureImg: "spider.png" },
+                      { target: "螢火蟲", scan: "螢火蟲", desc: "照明電路", icon: <CircuitImage circuitId="beta_light_1" className="w-16 h-16 object-contain" />, creatureImg: "firefly.png" },
+                      { target: "地下球狀光蟲", scan: "魷魚、洞穴蠕蟲、球狀光蟲", desc: "超級照明電路", icon: <CircuitImage circuitId="beta_light_2" className="w-16 h-16 object-contain" />, creatureImg: "lightbug.png" },
+                      { target: "裸鼴蝠", scan: "裸鼴鼠", desc: "聲波激發電路 (遇到等半分鐘有兩隻)", icon: <CircuitImage circuitId="gamma_sonic" className="w-16 h-16 object-contain" />, creatureImg: "molebat.png" },
+                      { target: "發條戰車", scan: "發條戰車、損壞的發條戰車、遠古守衛者", desc: "超級加速電路", icon: <CircuitImage circuitId="beta_speed_2" className="w-16 h-16 object-contain" />, creatureImg: "rook.png" },
+                      { target: "發條騎士", scan: "發條騎士、損壞的發條騎士、鍍金騎士", desc: "棋聖電路", icon: <CircuitImage circuitId="gamma_chess" className="w-16 h-16 object-contain" />, creatureImg: "clockwork_knight.png" },
+                      { target: "啜食者", scan: "熊獾、啜食者", desc: "超級胃增益電路", icon: <CircuitImage circuitId="alpha_hunger_2" className="w-16 h-16 object-contain" />, creatureImg: "slurper.png" }
+                    ].map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-3.5 p-3 rounded-lg bg-stone-950/40 border border-stone-850 hover:border-stone-800 transition">
+                        <div className="bg-stone-900 p-2 rounded-lg border border-stone-800 shrink-0 flex items-center gap-2 animate-fade-in">
+                          {item.icon}
+                          <span className="text-stone-500 text-xs font-semibold">→</span>
+                          <img
+                            src={`${(import.meta as any).env.BASE_URL || "/"}images/creatures/${item.creatureImg}`}
+                            className="w-16 h-16 object-contain shrink-0"
+                            alt={item.target}
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs bg-amber-500/10 text-amber-400 px-1 py-0.2 rounded font-mono shrink-0 scale-90">
+                              {idx + 1}
+                            </span>
+                            <span className="font-bold text-white text-xs">{item.target}</span>
+                          </div>
+                          <p className="text-[11px] text-stone-400 mt-0.5 leading-snug">{item.desc}</p>
+                          <p className="text-[10px] text-stone-500 font-mono mt-0.5">掃描對象: {item.scan}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 常規生物與電路 */}
+                <div>
+                  <h3 className="text-sm font-serif font-bold text-amber-500 mb-3 pb-1 border-b border-stone-850 flex items-center gap-1.5">
+                    <Cpu className="h-4 w-4 text-amber-500" />
+                    常規生物與電路
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      { target: "鼴鼠", scan: "鼴鼠", desc: "光電電路 (可夜視)", icon: <CircuitImage circuitId="beta_nightvision" className="w-16 h-16 object-contain" />, creatureImg: "mole.png" },
+                      { target: "鳥", scan: "烏鴉、紅雀、雪雀、海鸚、金絲雀", desc: "增程電路 (無人機/聲波範圍)", icon: <CircuitImage circuitId="beta_range" className="w-16 h-16 object-contain" />, creatureImg: "bird.png" },
+                      { target: "浣貓", scan: "浣貓", desc: "再消化電路 (食物效益)", icon: <CircuitImage circuitId="gamma_digest" className="w-16 h-16 object-contain" />, creatureImg: "catcoon.png" },
+                      { target: "龍蠅", scan: "龍蠅、火焰獵犬、地熱蟎", desc: "熱能電路 (提供體溫加熱)", icon: <CircuitImage circuitId="beta_thermal" className="w-16 h-16 object-contain" />, creatureImg: "dragonfly.png" },
+                      { target: "獵犬", scan: "獵犬", desc: "胃增益電路 (飢餓減緩)", icon: <CircuitImage circuitId="alpha_hunger_1" className="w-16 h-16 object-contain" />, creatureImg: "hound.png" },
+                      { target: "電羊", scan: "伏特羊", desc: "電氣化電路 (受擊帶電反傷)", icon: <CircuitImage circuitId="beta_electric" className="w-16 h-16 object-contain" />, creatureImg: "voltgoat.png" },
+                      { target: "蛞蝓龜", scan: "蛞蝓龜、蝸牛龜、石蝦", desc: "格擋電路 (受擊防禦與嘲諷)", icon: <CircuitImage circuitId="gamma_block" className="w-16 h-16 object-contain" />, creatureImg: "slurtle.png" },
+                      { target: "寄居蟹奶奶", scan: "寄居蟹隱士、帝王蟹", desc: "合唱盒電路 (及其他增益電路)", icon: <CircuitImage circuitId="beta_choral" className="w-16 h-16 object-contain" />, creatureImg: "hermit.png" },
+                      { target: "蜂后", scan: "蜂王", desc: "蜂王蜜糖/豆增益電路", icon: <CircuitImage circuitId="alpha_combo_1" className="w-16 h-16 object-contain" />, creatureImg: "beequeen.png" }
+                    ].map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-3.5 p-3 rounded-lg bg-stone-950/40 border border-stone-850 hover:border-stone-800 transition">
+                        <div className="bg-stone-900 p-2 rounded-lg border border-stone-800 shrink-0 flex items-center gap-2">
+                          {item.icon}
+                          <span className="text-stone-500 text-xs font-semibold">→</span>
+                          <img
+                            src={`${(import.meta as any).env.BASE_URL || "/"}images/creatures/${item.creatureImg}`}
+                            className="w-16 h-16 object-contain shrink-0"
+                            alt={item.target}
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <span className="font-bold text-white text-xs block">{item.target}</span>
+                          <p className="text-[11px] text-stone-400 mt-0.5 leading-snug">{item.desc}</p>
+                          <p className="text-[10px] text-stone-500 font-mono mt-0.5">掃描對象: {item.scan}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 特殊與進階生物 */}
+                <div>
+                  <h3 className="text-sm font-serif font-bold text-amber-500 mb-3 pb-1 border-b border-stone-850 flex items-center gap-1.5">
+                    <Layers className="h-4 w-4 text-amber-500" />
+                    特殊與進階生物
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      { target: "護士蜘蛛", scan: "護士蜘蛛", desc: "超級強化電路 (召喚護盾/防禦強化)", icon: <CircuitImage circuitId="alpha_health_2" className="w-16 h-16 object-contain" />, creatureImg: "nurse_spider.png" },
+                      { target: "坎普斯", scan: "坎普斯", desc: "空間擴展電路 (額外背包欄位)", icon: <CircuitImage circuitId="beta_pocket" className="w-16 h-16 object-contain" />, creatureImg: "krampus.png" },
+                      { target: "寒冰獵犬", scan: "獨眼巨鹿、寒冰獵犬", desc: "製冷電路 (提供體溫降溫)", icon: <CircuitImage circuitId="beta_refrigerant" className="w-16 h-16 object-contain" />, creatureImg: "ice_hound.png" },
+                      { target: "鳥寶寶 (春季王的小鳥)", scan: "麋鹿鵝幼崽", desc: "旋轉週期電路 (工作/戰鬥旋轉收割)", icon: <CircuitImage circuitId="gamma_spin" className="w-16 h-16 object-contain" />, creatureImg: "mossling.png" }
+                    ].map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-3.5 p-3 rounded-lg bg-stone-950/40 border border-stone-850 hover:border-stone-800 transition">
+                        <div className="bg-stone-900 p-2 rounded-lg border border-stone-800 shrink-0 flex items-center gap-2">
+                          {item.icon}
+                          <span className="text-stone-500 text-xs font-semibold">→</span>
+                          <img
+                            src={`${(import.meta as any).env.BASE_URL || "/"}images/creatures/${item.creatureImg}`}
+                            className="w-16 h-16 object-contain shrink-0"
+                            alt={item.target}
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <span className="font-bold text-white text-xs block">{item.target}</span>
+                          <p className="text-[11px] text-stone-400 mt-0.5 leading-snug">{item.desc}</p>
+                          <p className="text-[10px] text-stone-500 font-mono mt-0.5">掃描對象: {item.scan}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 border-t border-stone-850 bg-stone-950/40 flex justify-end">
+                <button
+                  onClick={() => setShowCircuitSuggestions(false)}
+                  className="px-4 py-2 text-xs font-bold bg-stone-850 hover:bg-stone-800 text-stone-300 border border-stone-700 hover:border-stone-600 rounded-lg transition cursor-pointer"
+                >
+                  關閉
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
