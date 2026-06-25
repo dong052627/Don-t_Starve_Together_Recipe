@@ -2496,12 +2496,6 @@ export default function App() {
                           </p>
                         </div>
                         <div className="flex items-center gap-3">
-                          <div className="bg-stone-900 border border-stone-800 rounded-lg px-3 py-1 text-center shrink-0">
-                            <span className="text-[10px] text-stone-400 block leading-none font-mono">剩餘啟迪點數</span>
-                            <span className="text-sm font-bold font-mono text-amber-500">
-                              {15 - wxSkills.length} <span className="text-[10px] text-stone-500">/ 15</span>
-                            </span>
-                          </div>
                           <button
                             onClick={() => setWxSkills([])}
                             className="text-xs px-2.5 py-1.5 rounded-lg border border-stone-800 hover:border-rose-500/30 hover:bg-rose-500/5 text-stone-400 hover:text-rose-400 transition cursor-pointer"
@@ -2549,6 +2543,33 @@ export default function App() {
                         className="relative w-full bg-stone-950 border border-stone-850 rounded-xl shadow-inner max-w-[750px] mx-auto group"
                         style={{ aspectRatio: "594/374" }}
                       >
+                        {/* Remaining Skill Points Overlay (Eye Outline) */}
+                        <div
+                          className="absolute flex items-center justify-center pointer-events-none"
+                          style={{
+                            left: "50%",
+                            top: "21.7%",
+                            width: "9.2%",
+                            height: "14.6%",
+                            transform: "translate(-50%, -50%)",
+                            zIndex: 5,
+                          }}
+                        >
+                          <div className="relative w-full h-full flex items-center justify-center">
+                            <img
+                              src={`${(import.meta as any).env.BASE_URL || "/"}images/skilltree/skill_icon_textbox.png`}
+                              className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
+                              alt="Remaining Points Eye Frame"
+                            />
+                            {/* Remaining Points Text inside the eye outline */}
+                            <span 
+                              className={`relative z-10 font-bold font-mono ${15 - wxSkills.length > 0 ? "text-amber-400" : "text-stone-400"} text-[10px] sm:text-xs md:text-sm mt-[6%] drop-shadow-[0_1.5px_1.5px_rgba(0,0,0,0.85)]`}
+                            >
+                              {15 - wxSkills.length}
+                            </span>
+                          </div>
+                        </div>
+
                         {/* Clipped background layers wrapper */}
                         <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none" style={{ zIndex: 1 }}>
                           {/* Scroll Paper Background */}
