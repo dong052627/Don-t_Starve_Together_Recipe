@@ -50,13 +50,13 @@ npm run dev
 
 ### 🔔 GitHub 設定步驟（首次部署需設定）：
 
-1.  將專案 Push 到你的 GitHub 儲存庫（如：`dong052627/Don-t_Starve_Together_Recipe`）。
+1.  將專案 Push 到你的 GitHub 儲存庫（如：`dong052627/Dong-Ting-Dont-Starve-Together-Wiki`）。
 2.  前往該專案的 GitHub 頁面，點擊 **Settings** (設定) -> **Pages**。
 3.  在 **Build and deployment** -> **Source** 選擇 **GitHub Actions**（而非 Deploy from a branch）。
-4.  當你推送程式碼至 `main` 分支後，GitHub Actions 將會自動執行並部署，稍等片刻即可透過 `https://dong052627.github.io/Don-t_Starve_Together_Recipe/` 存取你的模擬器！
+4.  當你推送程式碼至 `main` 分支後，GitHub Actions 將會自動執行並部署，稍等片刻即可透過 `https://dong052627.github.io/Dong-Ting-Dont-Starve-Together-Wiki/` 存取你的模擬器！
 
 > [!TIP]
-> 部署的路由基礎路徑已在 `vite.config.ts` 中配置為 `base: process.env.GITHUB_ACTIONS ? '/Don-t_Starve_Together_Recipe/' : '/'`。如果您更換了 GitHub 儲存庫名稱，請記得調整該路徑，以避免部署後靜態資源加載失敗 (404)。
+> 部署的路由基礎路徑已在 `vite.config.ts` 中配置為 `base: process.env.GITHUB_ACTIONS ? '/Dong-Ting-Dont-Starve-Together-Wiki/' : '/'`。如果您更換了 GitHub 儲存庫名稱，請記得調整該路徑，以避免部署後靜態資源加載失敗 (404)。
 
 ---
 
