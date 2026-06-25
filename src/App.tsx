@@ -24,6 +24,8 @@ import {
   UserCheck,
   Cpu,
   Zap,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import {
   INGREDIENTS,
@@ -37,6 +39,7 @@ import {
   getMissingRequirements,
 } from "./recipesData";
 import { CHARACTERS, Character, Circuit } from "./data/characters";
+import { WX78_SKILL_TREE } from "./data/skilltree";
 
 const SPECIAL_INGREDIENTS = [
   { id: "mandrake", names: ["曼德拉草", "mandrake"] },
@@ -217,6 +220,177 @@ export default function App() {
   const [expandedCircuitIds, setExpandedCircuitIds] = useState<
     Record<string, boolean>
   >({});
+  const [wxSkills, setWxSkills] = useState<string[]>([
+    "wx78_circuitry_alphabuffs_1",
+    "wx78_circuitry_alphabuffs_2",
+    "wx78_circuitry_betabuffs_1",
+    "wx78_circuitry_betabuffs_2",
+    "wx78_circuitry_slot_1",
+    "wx78_extrabody_1",
+    "wx78_ghostrevive_1",
+    "wx78_extrabody_2",
+    "wx78_extrabody_3",
+    "wx78_remotebodyswap",
+    "wx78_scoutdrone_1",
+    "wx78_deliverydrone_1",
+    "wx78_deliverydrone_2",
+    "wx78_extradronerange",
+    "wx78_allegiance_lunar",
+  ]);
+  const [celestialDefeated, setCelestialDefeated] = useState<boolean>(true);
+  const [shadowDefeated, setShadowDefeated] = useState<boolean>(false);
+
+  const currentCharacter = useMemo(() => {
+    return CHARACTERS.find((c) => c.id === activeCharacterId) || CHARACTERS[0];
+  }, [activeCharacterId]);
+
+  const getNodePosPct = (pos: [number, number]): { x: number; y: number } => {
+    // scale_x = 1.18, offset_x = 288
+    // scale_y = 1.25, offset_y = 350
+    // Percentages of container width=594, height=374:
+    const x = ((288 + pos[0] * 1.18) / 594) * 100;
+    const y = ((350 - pos[1] * 1.25) / 374) * 100;
+    return { x, y };
+  };
+
+
+
+
+
+  // Helper function to recursively validate skill dependencies
+  const getValidSkills = (
+    active: string[],
+    celDefeated: boolean,
+    shaDefeated: boolean
+  ): string[] => {
+    let current = [...active];
+    let changed = true;
+    while (changed) {
+      changed = false;
+      const next: string[] = [];
+      for (const skillId of current) {
+        let valid = false;
+
+        // Check root status and parent requirements
+        if (skillId === "wx78_circuitry_betterunplug") valid = true;
+        else if (skillId === "wx78_circuitry_bettercharge") valid = true;
+        else if (skillId === "wx78_circuitry_alphabuffs_1") valid = true;
+        else if (skillId === "wx78_circuitry_alphabuffs_2") valid = current.includes("wx78_circuitry_alphabuffs_1");
+        else if (skillId === "wx78_circuitry_betabuffs_1") valid = true;
+        else if (skillId === "wx78_circuitry_betabuffs_2") valid = current.includes("wx78_circuitry_betabuffs_1");
+        else if (skillId === "wx78_circuitry_gammabuffs_1") valid = true;
+        else if (skillId === "wx78_circuitry_gammabuffs_2") valid = current.includes("wx78_circuitry_gammabuffs_1");
+        else if (skillId === "wx78_circuitry_slot_1") {
+          valid = current.includes("wx78_circuitry_alphabuffs_2") ||
+            current.includes("wx78_circuitry_betabuffs_2") ||
+            current.includes("wx78_circuitry_gammabuffs_2");
+        }
+        else if (skillId === "wx78_extrabody_1") valid = true;
+        else if (skillId === "wx78_ghostrevive_1") valid = current.includes("wx78_extrabody_1");
+        else if (skillId === "wx78_ghostrevive_2") valid = current.includes("wx78_ghostrevive_1");
+        else if (skillId === "wx78_ghostrevive_3") valid = current.includes("wx78_ghostrevive_2");
+        else if (skillId === "wx78_extrabody_2") valid = current.includes("wx78_ghostrevive_1");
+        else if (skillId === "wx78_extrabody_3") valid = current.includes("wx78_extrabody_2");
+        else if (skillId === "wx78_remotebodyswap") valid = current.includes("wx78_extrabody_3");
+        else if (skillId === "wx78_bodycircuits") valid = current.includes("wx78_ghostrevive_1");
+        else if (skillId === "wx78_scoutdrone_1") valid = true;
+        else if (skillId === "wx78_extradronerange") valid = true;
+        else if (skillId === "wx78_deliverydrone_1") valid = true;
+        else if (skillId === "wx78_deliverydrone_2") valid = current.includes("wx78_deliverydrone_1");
+        else if (skillId === "wx78_zapdrone_1") valid = true;
+        else if (skillId === "wx78_zapdrone_2") valid = current.includes("wx78_zapdrone_1");
+        else if (skillId === "wx78_allegiance_lunar") {
+          const maxbodies = current.includes("wx78_extrabody_2") || current.includes("wx78_extrabody_3");
+          const noShadow = !current.includes("wx78_allegiance_shadow");
+          valid = maxbodies && noShadow && celDefeated;
+        }
+        else if (skillId === "wx78_allegiance_shadow") {
+          const maxbodies = current.includes("wx78_extrabody_2") || current.includes("wx78_extrabody_3");
+          const noLunar = !current.includes("wx78_allegiance_lunar");
+          valid = maxbodies && noLunar && shaDefeated;
+        }
+
+        if (valid) {
+          next.push(skillId);
+        } else {
+          changed = true;
+        }
+      }
+      current = next;
+    }
+    return current;
+  };
+
+  const canUnlockSkill = (
+    skillId: string,
+    activeList: string[],
+    celDefeated: boolean,
+    shaDefeated: boolean
+  ): boolean => {
+    const node = (WX78_SKILL_TREE as any)[skillId];
+    if (!node || node.isLock) return false;
+    if (activeList.includes(skillId)) return false;
+    if (activeList.length >= 15) return false;
+
+    // Check locks
+    if (skillId === "wx78_allegiance_lunar") {
+      const lockSatisfied =
+        (activeList.includes("wx78_extrabody_2") || activeList.includes("wx78_extrabody_3")) &&
+        !activeList.includes("wx78_allegiance_shadow") &&
+        celDefeated;
+      return lockSatisfied;
+    }
+    if (skillId === "wx78_allegiance_shadow") {
+      const lockSatisfied =
+        (activeList.includes("wx78_extrabody_2") || activeList.includes("wx78_extrabody_3")) &&
+        !activeList.includes("wx78_allegiance_lunar") &&
+        shaDefeated;
+      return lockSatisfied;
+    }
+
+    // Check parent
+    if (node.root) return true;
+
+    // Otherwise, find if any active node connects to this node
+    const hasActiveParent = Object.values(WX78_SKILL_TREE).some(parent =>
+      parent.connects.includes(skillId) && activeList.includes(parent.id)
+    );
+
+    return hasActiveParent;
+  };
+
+  const maxSlots = wxSkills.includes("wx78_circuitry_slot_1") ? 7 : 6;
+
+  // Sync effect: automatically uninstall circuits exceeding 6 slots if slot expansion is deactivated
+  useEffect(() => {
+    if (!wxSkills.includes("wx78_circuitry_slot_1")) {
+      let newCircuits = [...wxCircuits];
+      const checkAndTrim = (type: "alpha" | "beta" | "gamma") => {
+        let slotsUsed = 0;
+        const indexesToKeep: number[] = [];
+        newCircuits.forEach((cId, idx) => {
+          const circ = currentCharacter.circuits?.find((c) => c.id === cId);
+          if (circ && circ.type === type) {
+            if (slotsUsed + circ.slots <= 6) {
+              slotsUsed += circ.slots;
+              indexesToKeep.push(idx);
+            }
+          } else {
+            indexesToKeep.push(idx);
+          }
+        });
+        newCircuits = newCircuits.filter((_, idx) => indexesToKeep.includes(idx));
+      };
+
+      checkAndTrim("alpha");
+      checkAndTrim("beta");
+      checkAndTrim("gamma");
+
+      if (newCircuits.length !== wxCircuits.length) {
+        setWxCircuits(newCircuits);
+      }
+    }
+  }, [wxSkills, wxCircuits, currentCharacter]);
 
   const toggleCircuitExpand = (id: string) => {
     setExpandedCircuitIds((prev) => ({
@@ -224,10 +398,6 @@ export default function App() {
       [id]: !prev[id],
     }));
   };
-
-  const currentCharacter = useMemo(() => {
-    return CHARACTERS.find((c) => c.id === activeCharacterId) || CHARACTERS[0];
-  }, [activeCharacterId]);
 
   const totalSlotsUsed = useMemo(() => {
     const result = { alpha: 0, beta: 0, gamma: 0 };
@@ -249,7 +419,6 @@ export default function App() {
         circuitId: string;
         name: string;
         color: string;
-        indexInCircuit: number;
         slots: number;
         originalIndex: number;
       }[] = [];
@@ -266,38 +435,37 @@ export default function App() {
         if (type === "gamma")
           color = "bg-emerald-950/60 border-emerald-500/60 text-emerald-300";
 
-        for (let i = 0; i < circ.slots; i++) {
-          representation.push({
-            circuitId: circ.id,
-            name: circ.name,
-            color,
-            indexInCircuit: i,
-            slots: circ.slots,
-            originalIndex,
-          });
-        }
+        representation.push({
+          circuitId: circ.id,
+          name: circ.name,
+          color,
+          slots: circ.slots,
+          originalIndex,
+        });
       });
 
       const result: (
         | {
-            empty: boolean;
-            name?: string;
-            color?: string;
-            indexInCircuit?: number;
-            slots?: number;
-            originalIndex?: number;
-          }
+          empty: true;
+          circuitId?: undefined;
+          name?: undefined;
+          color?: undefined;
+          slots?: undefined;
+          originalIndex?: undefined;
+        }
         | {
-            empty: false;
-            circuitId: string;
-            name: string;
-            color: string;
-            indexInCircuit: number;
-            slots: number;
-            originalIndex: number;
-          }
+          empty: false;
+          circuitId: string;
+          name: string;
+          color: string;
+          slots: number;
+          originalIndex: number;
+        }
       )[] = representation.map((r) => ({ empty: false, ...r }));
-      while (result.length < 6) {
+
+      const totalOccupied = representation.reduce((sum, r) => sum + r.slots, 0);
+      const remaining = maxSlots - totalOccupied;
+      for (let i = 0; i < remaining; i++) {
         result.push({ empty: true });
       }
       return result;
@@ -308,7 +476,7 @@ export default function App() {
       beta: getCategoryAllocation("beta"),
       gamma: getCategoryAllocation("gamma"),
     };
-  }, [wxCircuits, currentCharacter]);
+  }, [wxCircuits, currentCharacter, maxSlots]);
 
   const calculatedStats = useMemo(() => {
     let health = currentCharacter.health;
@@ -332,9 +500,53 @@ export default function App() {
     let hasSonic = false;
     let hasSpin = false;
 
+    // Talent tree specific stats
+    let backupChassisLimit = 0;
+    let hasWarmStandby = false;
+    let hasRemoteTransfer = false;
+    let hasScoutDrone = false;
+    let hasDeliveryDrone = false;
+    let hasZapDrone = false;
+    let hasSignalBooster = false;
+    let hasLunarVessel = false;
+    let hasShadowServitor = false;
+
     if (currentCharacter.id === "wx78") {
       let speedCount = 0;
       let hardyCount = 0;
+
+      // Extract talent tree flags
+      if (wxSkills.includes("wx78_extrabody_3")) backupChassisLimit = 3;
+      else if (wxSkills.includes("wx78_extrabody_2")) backupChassisLimit = 2;
+      else if (wxSkills.includes("wx78_extrabody_1")) backupChassisLimit = 1;
+
+      hasWarmStandby = wxSkills.includes("wx78_bodycircuits");
+      hasRemoteTransfer = wxSkills.includes("wx78_remotebodyswap");
+      hasScoutDrone = wxSkills.includes("wx78_scoutdrone_1");
+      hasDeliveryDrone = wxSkills.includes("wx78_deliverydrone_1");
+      hasZapDrone = wxSkills.includes("wx78_zapdrone_1");
+      hasSignalBooster = wxSkills.includes("wx78_extradronerange");
+      hasLunarVessel = wxSkills.includes("wx78_allegiance_lunar");
+      hasShadowServitor = wxSkills.includes("wx78_allegiance_shadow");
+
+      // Calculate hunger reduction percentage
+      let hungerReduction = 0;
+      wxCircuits.forEach((cId) => {
+        if (cId === "alpha_hunger_1") {
+          let r = 5;
+          if (wxSkills.includes("wx78_circuitry_alphabuffs_1")) r = 10;
+          hungerReduction += r;
+        }
+        if (cId === "alpha_hunger_2") {
+          let r = 20;
+          if (wxSkills.includes("wx78_circuitry_alphabuffs_2")) r = 30;
+          else if (wxSkills.includes("wx78_circuitry_alphabuffs_1")) r = 25;
+          hungerReduction += r;
+        }
+      });
+      if (hungerReduction > 0) {
+        hungerRateText = `飢餓率降低 ${hungerReduction}%`;
+      }
 
       wxCircuits.forEach((cId) => {
         const circ = currentCharacter.circuits?.find((c) => c.id === cId);
@@ -350,12 +562,6 @@ export default function App() {
         // 2. Extra effects
         if (cId === "alpha_health_1" || cId === "alpha_health_2") {
           hardyCount++;
-        }
-        if (cId === "alpha_hunger_1") {
-          if (!hungerRateText) hungerRateText = "降低少量飢餓消耗";
-        }
-        if (cId === "alpha_hunger_2") {
-          hungerRateText = "降低中量飢餓消耗";
         }
         if (cId === "alpha_sanity_2") {
           sanityRegen += 2;
@@ -405,7 +611,17 @@ export default function App() {
         }
       });
 
-      if (hardyCount > 0) {
+      // Calculate armor percent from hardy circuits if Alpha Tinkering II is active
+      let armorPercent = 0;
+      if (wxSkills.includes("wx78_circuitry_alphabuffs_2")) {
+        const health1Count = wxCircuits.filter(c => c === "alpha_health_1").length;
+        const health2Count = wxCircuits.filter(c => c === "alpha_health_2").length;
+        armorPercent = health1Count * 2.5 + health2Count * 5;
+      }
+
+      if (armorPercent > 0) {
+        physicalReduction = `外殼防禦 +${armorPercent}% (物理減免)`;
+      } else if (hardyCount > 0) {
         physicalReduction =
           hardyCount >= 2 ? "較多物理傷害減免" : "少量物理傷害減免";
       }
@@ -430,8 +646,17 @@ export default function App() {
       hasBlock,
       hasSonic,
       hasSpin,
+      backupChassisLimit,
+      hasWarmStandby,
+      hasRemoteTransfer,
+      hasScoutDrone,
+      hasDeliveryDrone,
+      hasZapDrone,
+      hasSignalBooster,
+      hasLunarVessel,
+      hasShadowServitor,
     };
-  }, [wxCircuits, currentCharacter]);
+  }, [wxCircuits, currentCharacter, wxSkills]);
 
   const handleInstallCircuit = (circuit: Circuit) => {
     const currentCount = wxCircuits.filter((id) => id === circuit.id).length;
@@ -446,7 +671,7 @@ export default function App() {
       return acc;
     }, 0);
 
-    if (slotsOfThisType + circuit.slots > 6) return;
+    if (slotsOfThisType + circuit.slots > maxSlots) return;
     setWxCircuits([...wxCircuits, circuit.id]);
   };
 
@@ -866,11 +1091,10 @@ export default function App() {
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setActiveTab("recipes")}
-              className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all duration-150 flex items-center gap-1.5 cursor-pointer ${
-                activeTab === "recipes"
-                  ? "bg-amber-600 text-stone-950 border-amber-500 font-bold shadow-md shadow-amber-900/20"
-                  : "bg-stone-800 border-stone-700 text-stone-300 hover:bg-stone-750"
-              }`}
+              className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all duration-150 flex items-center gap-1.5 cursor-pointer ${activeTab === "recipes"
+                ? "bg-amber-600 text-stone-950 border-amber-500 font-bold shadow-md shadow-amber-900/20"
+                : "bg-stone-800 border-stone-700 text-stone-300 hover:bg-stone-750"
+                }`}
               id="tab-recipes-btn"
             >
               <UtensilsCrossed className="h-4 w-4" />
@@ -879,11 +1103,10 @@ export default function App() {
 
             <button
               onClick={() => setActiveTab("simulator")}
-              className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all duration-150 flex items-center gap-1.5 cursor-pointer ${
-                activeTab === "simulator"
-                  ? "bg-amber-600 text-stone-950 border-amber-500 font-bold shadow-md shadow-amber-900/20"
-                  : "bg-stone-800 border-stone-700 text-stone-300 hover:bg-stone-750"
-              }`}
+              className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all duration-150 flex items-center gap-1.5 cursor-pointer ${activeTab === "simulator"
+                ? "bg-amber-600 text-stone-950 border-amber-500 font-bold shadow-md shadow-amber-900/20"
+                : "bg-stone-800 border-stone-700 text-stone-300 hover:bg-stone-750"
+                }`}
               id="tab-simulator-btn"
             >
               <Flame className="h-4 w-4" />
@@ -892,11 +1115,10 @@ export default function App() {
 
             <button
               onClick={() => setActiveTab("characters")}
-              className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all duration-150 flex items-center gap-1.5 cursor-pointer ${
-                activeTab === "characters"
-                  ? "bg-amber-600 text-stone-950 border-amber-500 font-bold shadow-md shadow-amber-900/20"
-                  : "bg-stone-800 border-stone-700 text-stone-300 hover:bg-stone-750"
-              }`}
+              className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all duration-150 flex items-center gap-1.5 cursor-pointer ${activeTab === "characters"
+                ? "bg-amber-600 text-stone-950 border-amber-500 font-bold shadow-md shadow-amber-900/20"
+                : "bg-stone-800 border-stone-700 text-stone-300 hover:bg-stone-750"
+                }`}
               id="tab-characters-btn"
             >
               <UserCheck className="h-4 w-4" />
@@ -967,11 +1189,10 @@ export default function App() {
                         <button
                           key={catKey}
                           onClick={() => toggleCatRecipes(catKey)}
-                          className={`flex flex-col items-center justify-between py-2 px-0.5 rounded-lg border text-center transition-all duration-150 cursor-pointer ${
-                            isExpanded
-                              ? "bg-amber-600 border-amber-500 text-stone-950 font-bold shadow-md shadow-amber-950/40 scale-[1.03]"
-                              : "bg-stone-900 border-stone-850 text-stone-400 hover:border-stone-750 hover:bg-stone-850"
-                          }`}
+                          className={`flex flex-col items-center justify-between py-2 px-0.5 rounded-lg border text-center transition-all duration-150 cursor-pointer ${isExpanded
+                            ? "bg-amber-600 border-amber-500 text-stone-950 font-bold shadow-md shadow-amber-950/40 scale-[1.03]"
+                            : "bg-stone-900 border-stone-850 text-stone-400 hover:border-stone-750 hover:bg-stone-850"
+                            }`}
                           id={`cat-tile-${catKey}`}
                         >
                           <span className="text-base sm:text-lg mb-0.5 select-none">
@@ -1045,11 +1266,10 @@ export default function App() {
                                     onClick={() =>
                                       toggleIngredientCheck(ing.id)
                                     }
-                                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs transition border cursor-pointer ${
-                                      isChecked
-                                        ? "bg-amber-600/25 text-white border-amber-500/60 font-medium"
-                                        : "bg-stone-900/40 text-stone-400 border-stone-850 hover:border-stone-750"
-                                    }`}
+                                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs transition border cursor-pointer ${isChecked
+                                      ? "bg-amber-600/25 text-white border-amber-500/60 font-medium"
+                                      : "bg-stone-900/40 text-stone-400 border-stone-850 hover:border-stone-750"
+                                      }`}
                                   >
                                     <IngredientImage
                                       ingredientId={ing.id}
@@ -1187,11 +1407,10 @@ export default function App() {
                             setSortBy("hp");
                             setSortDirection("desc");
                           }}
-                          className={`flex-1 py-1 text-[11px] font-medium rounded transition cursor-pointer flex items-center justify-center gap-1 ${
-                            sortBy === "hp"
-                              ? "bg-rose-950/40 text-rose-300 font-bold"
-                              : "text-stone-400 hover:text-stone-200"
-                          }`}
+                          className={`flex-1 py-1 text-[11px] font-medium rounded transition cursor-pointer flex items-center justify-center gap-1 ${sortBy === "hp"
+                            ? "bg-rose-950/40 text-rose-300 font-bold"
+                            : "text-stone-400 hover:text-stone-200"
+                            }`}
                         >
                           <StateIcon
                             type="hp"
@@ -1204,11 +1423,10 @@ export default function App() {
                             setSortBy("hunger");
                             setSortDirection("desc");
                           }}
-                          className={`flex-1 py-1 text-[11px] font-medium rounded transition cursor-pointer flex items-center justify-center gap-1 ${
-                            sortBy === "hunger"
-                              ? "bg-amber-950/40 text-amber-300 font-bold"
-                              : "text-stone-400 hover:text-stone-200"
-                          }`}
+                          className={`flex-1 py-1 text-[11px] font-medium rounded transition cursor-pointer flex items-center justify-center gap-1 ${sortBy === "hunger"
+                            ? "bg-amber-950/40 text-amber-300 font-bold"
+                            : "text-stone-400 hover:text-stone-200"
+                            }`}
                         >
                           <StateIcon
                             type="hunger"
@@ -1221,11 +1439,10 @@ export default function App() {
                             setSortBy("sanity");
                             setSortDirection("desc");
                           }}
-                          className={`flex-1 py-1 text-[11px] font-medium rounded transition cursor-pointer flex items-center justify-center gap-1 ${
-                            sortBy === "sanity"
-                              ? "bg-sky-950/40 text-sky-300 font-bold"
-                              : "text-stone-400 hover:text-stone-200"
-                          }`}
+                          className={`flex-1 py-1 text-[11px] font-medium rounded transition cursor-pointer flex items-center justify-center gap-1 ${sortBy === "sanity"
+                            ? "bg-sky-950/40 text-sky-300 font-bold"
+                            : "text-stone-400 hover:text-stone-200"
+                            }`}
                         >
                           <StateIcon
                             type="sanity"
@@ -1327,11 +1544,10 @@ export default function App() {
                       return (
                         <div
                           key={recipe.id}
-                          className={`bg-stone-900 border rounded-xl overflow-hidden hover:border-amber-500/60 transition-all duration-200 flex flex-col justify-between ${
-                            isSpecial
-                              ? "border-amber-500 shadow-lg shadow-amber-500/15 ring-1 ring-amber-500/30 animate-dst-glow"
-                              : "border-stone-700"
-                          }`}
+                          className={`bg-stone-900 border rounded-xl overflow-hidden hover:border-amber-500/60 transition-all duration-200 flex flex-col justify-between ${isSpecial
+                            ? "border-amber-500 shadow-lg shadow-amber-500/15 ring-1 ring-amber-500/30 animate-dst-glow"
+                            : "border-stone-700"
+                            }`}
                         >
                           {/* Top part */}
                           <div className="p-4">
@@ -1397,11 +1613,10 @@ export default function App() {
                                     return (
                                       <span
                                         key={idx}
-                                        className={`px-1.5 py-0.5 rounded text-[10px] flex items-center gap-0.5 border font-mono ${
-                                          hasIt
-                                            ? "bg-amber-950 text-stone-200 border-amber-900/30"
-                                            : "bg-stone-950 text-stone-500 line-through border-transparent"
-                                        }`}
+                                        className={`px-1.5 py-0.5 rounded text-[10px] flex items-center gap-0.5 border font-mono ${hasIt
+                                          ? "bg-amber-950 text-stone-200 border-amber-900/30"
+                                          : "bg-stone-950 text-stone-500 line-through border-transparent"
+                                          }`}
                                         title={ing.name}
                                       >
                                         <IngredientImage
@@ -1601,11 +1816,10 @@ export default function App() {
                                 ingId && handleRemoveIngredientFromPot(idx)
                               }
                               disabled={isCooking || !ingId}
-                              className={`h-16 w-full rounded-xl border flex flex-col items-center justify-center relative cursor-pointer group transition ${
-                                ingId
-                                  ? `${ingredient?.color} shadow-md`
-                                  : "bg-stone-950 border-stone-800 border-dashed text-stone-650 hover:border-stone-700"
-                              }`}
+                              className={`h-16 w-full rounded-xl border flex flex-col items-center justify-center relative cursor-pointer group transition ${ingId
+                                ? `${ingredient?.color} shadow-md`
+                                : "bg-stone-950 border-stone-800 border-dashed text-stone-650 hover:border-stone-700"
+                                }`}
                               title={ingId ? "點擊移除" : "空草位"}
                             >
                               {ingId && ingredient ? (
@@ -1672,11 +1886,10 @@ export default function App() {
                       <button
                         onClick={triggerCookProcess}
                         disabled={isCooking || potSlots.some((id) => id === "")}
-                        className={`flex-1 py-1 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
-                          potSlots.some((id) => id === "")
-                            ? "bg-stone-800 text-stone-600 border border-stone-850 cursor-not-allowed"
-                            : "bg-amber-600 text-stone-950 hover:bg-amber-500 shadow-lg shadow-amber-900/20"
-                        }`}
+                        className={`flex-1 py-1 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${potSlots.some((id) => id === "")
+                          ? "bg-stone-800 text-stone-600 border border-stone-850 cursor-not-allowed"
+                          : "bg-amber-600 text-stone-950 hover:bg-amber-500 shadow-lg shadow-amber-900/20"
+                          }`}
                       >
                         <Flame className="h-3.5 w-3.5" />
                         開火烹飪！
@@ -2033,11 +2246,10 @@ export default function App() {
                                         onClick={() =>
                                           handleAddIngredientToPot(ing.id)
                                         }
-                                        className={`flex items-center justify-between p-1.5 rounded-lg text-xs border transition cursor-pointer ${
-                                          isPotFull
-                                            ? "bg-stone-950 text-stone-600 border-transparent cursor-not-allowed"
-                                            : "bg-stone-950 text-stone-300 border-stone-800 hover:border-amber-900/40 hover:bg-stone-800"
-                                        }`}
+                                        className={`flex items-center justify-between p-1.5 rounded-lg text-xs border transition cursor-pointer ${isPotFull
+                                          ? "bg-stone-950 text-stone-600 border-transparent cursor-not-allowed"
+                                          : "bg-stone-950 text-stone-300 border-stone-800 hover:border-amber-900/40 hover:bg-stone-800"
+                                          }`}
                                       >
                                         <span className="flex items-center gap-1 text-left truncate flex-1 min-w-0">
                                           <IngredientImage
@@ -2097,11 +2309,10 @@ export default function App() {
                     {/* WX-78 */}
                     <button
                       onClick={() => setActiveCharacterId("wx78")}
-                      className={`w-full text-left p-3 rounded-xl border transition-all flex items-center gap-3 cursor-pointer ${
-                        activeCharacterId === "wx78"
-                          ? "bg-amber-600/10 border-amber-500/60 shadow-md shadow-amber-900/10"
-                          : "bg-stone-950/40 border-stone-850 hover:border-stone-750"
-                      }`}
+                      className={`w-full text-left p-3 rounded-xl border transition-all flex items-center gap-3 cursor-pointer ${activeCharacterId === "wx78"
+                        ? "bg-amber-600/10 border-amber-500/60 shadow-md shadow-amber-900/10"
+                        : "bg-stone-950/40 border-stone-850 hover:border-stone-750"
+                        }`}
                     >
                       <div className="w-12 h-12 rounded-lg bg-stone-900 border border-stone-800 overflow-hidden shrink-0 flex items-center justify-center relative">
                         <img
@@ -2230,11 +2441,11 @@ export default function App() {
                     totalSlotsUsed.beta +
                     totalSlotsUsed.gamma ===
                     18 && (
-                    <div className="absolute inset-0 bg-radial from-amber-600/5 via-transparent to-transparent pointer-events-none animate-pulse" />
-                  )}
+                      <div className="absolute inset-0 bg-radial from-amber-600/5 via-transparent to-transparent pointer-events-none animate-pulse" />
+                    )}
 
                   <div className="flex flex-col md:flex-row gap-6 items-start relative z-10">
-                    <div className="w-28 h-28 rounded-2xl overflow-hidden bg-stone-950 border border-amber-500/30 shadow-lg shadow-black/40 shrink-0 flex items-center justify-center animate-dst-glow">
+                    <div className="w-28 h-28 rounded-2xl overflow-hidden bg-stone-950 border border-amber-500/30 shadow-lg shadow-black/40 shrink-0 flex items-center justify-center">
                       <img
                         src={`${(import.meta as any).env.BASE_URL || "/"}images/characters/wx78.png`}
                         className="w-full h-full object-cover"
@@ -2254,10 +2465,10 @@ export default function App() {
                           totalSlotsUsed.beta +
                           totalSlotsUsed.gamma ===
                           18 && (
-                          <span className="text-xs font-bold bg-amber-600 text-stone-950 px-2 py-0.5 rounded animate-bounce">
-                            ⚡ 系統已滿載 (Fully Overloaded)
-                          </span>
-                        )}
+                            <span className="text-xs font-bold bg-amber-600 text-stone-950 px-2 py-0.5 rounded animate-bounce">
+                              ⚡ 系統已滿載 (Fully Overloaded)
+                            </span>
+                          )}
                       </div>
                       <p className="text-amber-500/80 font-serif font-bold text-sm mt-1">
                         {currentCharacter.title}
@@ -2269,6 +2480,427 @@ export default function App() {
                   </div>
 
                   <hr className="border-stone-850 my-6" />
+
+                  {/* WX-78 Skill Tree Section */}
+                  {activeCharacterId === "wx78" && (
+                    <div className="bg-stone-950/40 border border-stone-850 rounded-xl p-4 mb-6 relative z-10">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                        <div>
+                          <h3 className="text-sm font-serif font-bold text-amber-500 flex items-center gap-1.5">
+                            <Cpu className="h-4 w-4" />
+                            機器人天賦樹 (WX-78 Skillset)
+                          </h3>
+                          <p className="text-[11px] text-stone-400 mt-0.5">
+                            官方 Insight 系統：使用 15 點啟迪點數啟動技能組，遵循排他性與解鎖規則
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="bg-stone-900 border border-stone-800 rounded-lg px-3 py-1 text-center shrink-0">
+                            <span className="text-[10px] text-stone-400 block leading-none font-mono">剩餘啟迪點數</span>
+                            <span className="text-sm font-bold font-mono text-amber-500">
+                              {15 - wxSkills.length} <span className="text-[10px] text-stone-500">/ 15</span>
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => setWxSkills([])}
+                            className="text-xs px-2.5 py-1.5 rounded-lg border border-stone-800 hover:border-rose-500/30 hover:bg-rose-500/5 text-stone-400 hover:text-rose-400 transition cursor-pointer"
+                          >
+                            重置面板
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Boss defeat check boxes */}
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4 bg-stone-950/20 border border-stone-850/40 rounded-lg p-2.5 text-xs text-stone-400">
+                        <span className="font-bold text-stone-300 font-serif">解鎖進度模擬 (Boss Defeated Status):</span>
+                        <label className="flex items-center gap-2 cursor-pointer hover:text-stone-200 select-none">
+                          <input
+                            type="checkbox"
+                            checked={celestialDefeated}
+                            onChange={(e) => {
+                              setCelestialDefeated(e.target.checked);
+                              if (!e.target.checked) {
+                                setWxSkills(prev => getValidSkills(prev, false, shadowDefeated));
+                              }
+                            }}
+                            className="rounded border-stone-800 text-amber-500 focus:ring-amber-500 focus:ring-offset-stone-950 bg-stone-900 w-4 h-4"
+                          />
+                          <span>已擊敗天體英雄 (Celestial Champion Killed)</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer hover:text-stone-200 select-none">
+                          <input
+                            type="checkbox"
+                            checked={shadowDefeated}
+                            onChange={(e) => {
+                              setShadowDefeated(e.target.checked);
+                              if (!e.target.checked) {
+                                setWxSkills(prev => getValidSkills(prev, celestialDefeated, false));
+                              }
+                            }}
+                            className="rounded border-stone-800 text-amber-500 focus:ring-amber-500 focus:ring-offset-stone-950 bg-stone-900 w-4 h-4"
+                          />
+                          <span>已擊敗織影者 (Ancient Fuelweaver Killed)</span>
+                        </label>
+                      </div>
+
+                      {/* Canvas Container */}
+                      <div
+                        className="relative w-full bg-stone-950 border border-stone-850 rounded-xl shadow-inner max-w-[750px] mx-auto group"
+                        style={{ aspectRatio: "594/374" }}
+                      >
+                        {/* Clipped background layers wrapper */}
+                        <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none" style={{ zIndex: 1 }}>
+                          {/* Scroll Paper Background */}
+                          <img
+                            src={`${(import.meta as any).env.BASE_URL || "/"}images/skilltree/scroll_background.png`}
+                            className="absolute inset-0 w-full h-full object-fill select-none opacity-95 brightness-90 scale-105"
+                            alt="Scroll Paper Background"
+                          />
+
+                          {/* Gears Background Overlay */}
+                          <img
+                            src={`${(import.meta as any).env.BASE_URL || "/"}images/skilltree/wx78_background.png`}
+                            className="absolute inset-0 w-full h-full object-cover select-none opacity-85 brightness-95"
+                            alt="WX-78 Skill Tree Gears"
+                          />
+                        </div>
+
+
+                        {/* SVG Connections Overlay */}
+                        <svg
+                          className="absolute inset-0 w-full h-full pointer-events-none"
+                          style={{ zIndex: 3 }}
+                        >
+
+                          <defs>
+                            <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                              <feGaussianBlur stdDeviation="3" result="blur" />
+                              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                            </filter>
+                          </defs>
+
+                          {/* Draw background lines first */}
+                          {Object.values(WX78_SKILL_TREE).map((node) => {
+                            return node.connects.map((childId) => {
+                              const childNode = (WX78_SKILL_TREE as any)[childId];
+                              if (!childNode) return null;
+
+                              const p1 = getNodePosPct(node.pos);
+                              const p2 = getNodePosPct(childNode.pos);
+                              const x1 = p1.x;
+                              const y1 = p1.y;
+                              const x2 = p2.x;
+                              const y2 = p2.y;
+
+                              const isParentActive = wxSkills.includes(node.id);
+                              const isChildActive = wxSkills.includes(childId);
+                              const isActive = isParentActive && isChildActive;
+                              const isConnecting = isParentActive && !isChildActive && canUnlockSkill(childId, wxSkills, celestialDefeated, shadowDefeated);
+
+                              let strokeColor = "#292524"; // stone-800
+                              let strokeWidth = "1.5";
+                              let strokeDash = undefined;
+                              let filter = undefined;
+
+                              if (isActive) {
+                                strokeColor = node.group === "allegiance" ? "#10b981" : "#f59e0b"; // emerald or amber
+                                strokeWidth = "2.5";
+                                filter = "url(#glow)";
+                              } else if (isConnecting) {
+                                strokeColor = "#78716c"; // stone-500
+                                strokeWidth = "1.5";
+                                strokeDash = "3,3";
+                              }
+
+                              return (
+                                <line
+                                  key={`line-${node.id}-${childId}`}
+                                  x1={`${x1}%`}
+                                  y1={`${y1}%`}
+                                  x2={`${x2}%`}
+                                  y2={`${y2}%`}
+                                  stroke={strokeColor}
+                                  strokeWidth={strokeWidth}
+                                  strokeDasharray={strokeDash}
+                                  filter={filter}
+                                  className="transition-all duration-300"
+                                />
+                              );
+                            });
+                          })}
+
+                          {/* Draw Lock connections */}
+                          {Object.values(WX78_SKILL_TREE).filter(n => n.locks && n.locks.length > 0).map((node) => {
+                            return node.locks!.map((lockId) => {
+                              const lockNode = (WX78_SKILL_TREE as any)[lockId];
+                              if (!lockNode) return null;
+
+                              const p1 = getNodePosPct(node.pos);
+                              const p2 = getNodePosPct(lockNode.pos);
+                              const x1 = p1.x;
+                              const y1 = p1.y;
+                              const x2 = p2.x;
+                              const y2 = p2.y;
+
+                              const isLockOpen =
+                                (wxSkills.includes("wx78_extrabody_2") || wxSkills.includes("wx78_extrabody_3")) &&
+                                (lockId === "wx78_allegiance_lunar_lock_1" ? !wxSkills.includes("wx78_allegiance_shadow") && celestialDefeated : !wxSkills.includes("wx78_allegiance_lunar") && shadowDefeated);
+
+                              const isSkillActive = wxSkills.includes(node.id);
+
+                              let strokeColor = "#292524"; // stone-800
+                              let strokeWidth = "1.5";
+                              let filter = undefined;
+
+                              if (isSkillActive && isLockOpen) {
+                                strokeColor = "#10b981"; // emerald-500
+                                strokeWidth = "2.5";
+                                filter = "url(#glow)";
+                              } else if (isLockOpen) {
+                                strokeColor = "#f59e0b"; // amber-500
+                                strokeWidth = "1.5";
+                              }
+
+                              return (
+                                <line
+                                  key={`line-${node.id}-${lockId}`}
+                                  x1={`${x1}%`}
+                                  y1={`${y1}%`}
+                                  x2={`${x2}%`}
+                                  y2={`${y2}%`}
+                                  stroke={strokeColor}
+                                  strokeWidth={strokeWidth}
+                                  filter={filter}
+                                  className="transition-all duration-300"
+                                />
+                              );
+                            });
+                          })}
+
+                          {/* Draw line from extrabody_3 to locks */}
+                          {["wx78_allegiance_lunar_lock_1", "wx78_shadow_allegiance_lock_1"].map(lockId => {
+                            const lockNode = (WX78_SKILL_TREE as any)[lockId];
+                            const extrabody3 = (WX78_SKILL_TREE as any)["wx78_extrabody_3"];
+                            if (!lockNode || !extrabody3) return null;
+
+                            const p1 = getNodePosPct(extrabody3.pos);
+                            const p2 = getNodePosPct(lockNode.pos);
+                            const x1 = p1.x;
+                            const y1 = p1.y;
+                            const x2 = p2.x;
+                            const y2 = p2.y;
+
+                            const isExtrabody3Active = wxSkills.includes("wx78_extrabody_3");
+                            const isExtrabody2Active = wxSkills.includes("wx78_extrabody_2");
+                            const isLockOpen =
+                              (isExtrabody2Active || isExtrabody3Active) &&
+                              (lockId === "wx78_allegiance_lunar_lock_1" ? !wxSkills.includes("wx78_allegiance_shadow") && celestialDefeated : !wxSkills.includes("wx78_allegiance_lunar") && shadowDefeated);
+
+                            let strokeColor = "#1c1917"; // stone-900
+                            let strokeWidth = "1";
+                            let strokeDash = "2,2";
+
+                            if (isLockOpen && (isExtrabody2Active || isExtrabody3Active)) {
+                              strokeColor = "#059669"; // emerald-600
+                              strokeWidth = "1.5";
+                              strokeDash = undefined;
+                            }
+
+                            return (
+                              <line
+                                key={`line-extrabody-${lockId}`}
+                                x1={`${x1}%`}
+                                y1={`${y1}%`}
+                                x2={`${x2}%`}
+                                y2={`${y2}%`}
+                                stroke={strokeColor}
+                                strokeWidth={strokeWidth}
+                                strokeDasharray={strokeDash}
+                                className="transition-all duration-300"
+                              />
+                            );
+                          })}
+                        </svg>
+
+                        {/* Render Node Buttons */}
+                        {Object.values(WX78_SKILL_TREE).map((node) => {
+                          const p = getNodePosPct(node.pos);
+                          const left_pct = p.x;
+                          const top_pct = p.y;
+
+                          const isActive = wxSkills.includes(node.id);
+
+                          if (node.isLock) {
+                            const maxbodiesActive = wxSkills.includes("wx78_extrabody_2") || wxSkills.includes("wx78_extrabody_3");
+                            const isLunar = node.id === "wx78_allegiance_lunar_lock_1";
+                            const noOpposingAlliance = isLunar ? !wxSkills.includes("wx78_allegiance_shadow") : !wxSkills.includes("wx78_allegiance_lunar");
+                            const bossDefeated = isLunar ? celestialDefeated : shadowDefeated;
+
+                            const requirementsMet = maxbodiesActive && noOpposingAlliance;
+                            const isLockOpen = requirementsMet && bossDefeated;
+
+                            // Determine lock state frames
+                            const lockBgFrame = isLockOpen
+                              ? "node_selected.png"
+                              : (requirementsMet ? "node_unselected.png" : "node_locked.png");
+
+                            const lockGlowClass = isLockOpen
+                              ? "drop-shadow-[0_0_6px_rgba(16,185,129,0.85)]"
+                              : (requirementsMet ? "drop-shadow-[0_0_6px_rgba(245,158,11,0.7)] animate-pulse" : "opacity-60");
+
+                            const lockIconColorClass = isLockOpen
+                              ? "text-emerald-400"
+                              : (requirementsMet ? "text-amber-400 animate-pulse" : "text-stone-500");
+
+                            return (
+                              <div
+                                key={node.id}
+                                style={{
+                                  left: `${left_pct}%`,
+                                  top: `${top_pct}%`,
+                                  transform: "translate(-50%, -50%)",
+                                }}
+                                className="absolute z-10 group/node hover:z-30"
+                              >
+                                <button
+                                  onClick={() => {
+                                    if (isLunar) {
+                                      setCelestialDefeated(prev => {
+                                        const next = !prev;
+                                        if (!next) {
+                                          setWxSkills(skills => getValidSkills(skills, false, shadowDefeated));
+                                        }
+                                        return next;
+                                      });
+                                    } else {
+                                      setShadowDefeated(prev => {
+                                        const next = !prev;
+                                        if (!next) {
+                                          setWxSkills(skills => getValidSkills(skills, celestialDefeated, false));
+                                        }
+                                        return next;
+                                      });
+                                    }
+                                  }}
+                                  className="relative w-8 h-8 md:w-9 md:h-9 flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 cursor-pointer focus:outline-none bg-transparent border-none outline-none"
+                                >
+                                  {/* Background frame image */}
+                                  <img
+                                    src={`${(import.meta as any).env.BASE_URL || "/"}images/skilltree/${lockBgFrame}`}
+                                    className={`absolute inset-0 w-full h-full object-contain pointer-events-none transition-all duration-300 ${lockGlowClass}`}
+                                    alt="lock-bg"
+                                  />
+                                  {/* Icon centered on top of frame */}
+                                  <div className={`relative z-10 flex items-center justify-center transition-all duration-300 ${lockIconColorClass}`}>
+                                    {isLockOpen ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                                  </div>
+                                </button>
+
+                                {/* Lock Node Tooltip */}
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-stone-905 border border-stone-800 rounded-lg p-2 shadow-xl opacity-0 scale-95 pointer-events-none group-hover/node:opacity-100 group-hover/node:scale-100 transition-all duration-200 z-50 text-stone-300 text-[10px] space-y-1 font-sans">
+                                  <div className="font-bold text-white text-xs">{node.title_zh}</div>
+                                  <div className="text-stone-500 font-mono">{node.title_en}</div>
+                                  <hr className="border-stone-800 my-1" />
+                                  <div className="text-[9px] leading-relaxed text-stone-400">
+                                    {node.desc_zh}
+                                  </div>
+                                  <hr className="border-stone-800 my-1" />
+                                  <div className="flex items-center justify-between text-[9px] font-bold">
+                                    <span>解鎖狀態:</span>
+                                    <span className={isLockOpen ? "text-emerald-400" : requirementsMet ? "text-amber-400" : "text-rose-400"}>
+                                      {isLockOpen ? "已開啟" : requirementsMet ? "可點擊解鎖" : "前置未達"}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          const isUnlockable = canUnlockSkill(node.id, wxSkills, celestialDefeated, shadowDefeated);
+
+                          // Determine background frame and styling
+                          const nodeBgFrame = isActive
+                            ? "node_selected.png"
+                            : (isUnlockable ? "node_unselected.png" : "node_locked.png");
+
+                          const nodeGlowClass = isActive
+                            ? (node.group === "allegiance"
+                              ? "drop-shadow-[0_0_8px_rgba(16,185,129,0.95)]"
+                              : "drop-shadow-[0_0_8px_rgba(245,158,11,0.95)]")
+                            : "";
+
+                          return (
+                            <div
+                              key={node.id}
+                              style={{
+                                left: `${left_pct}%`,
+                                top: `${top_pct}%`,
+                                transform: "translate(-50%, -50%)",
+                              }}
+                              className="absolute z-10 group/node hover:z-30"
+                            >
+                              <button
+                                onClick={() => {
+                                  if (isActive) {
+                                    const nextSkills = wxSkills.filter(id => id !== node.id);
+                                    setWxSkills(getValidSkills(nextSkills, celestialDefeated, shadowDefeated));
+                                  } else if (isUnlockable) {
+                                    setWxSkills([...wxSkills, node.id]);
+                                  }
+                                }}
+                                className={`relative w-10 h-10 md:w-12 md:h-12 flex items-center justify-center transition-all duration-300 active:scale-95 select-none focus:outline-none bg-transparent border-none outline-none ${isUnlockable ? "cursor-pointer hover:scale-110" : "cursor-default"}`}
+                              >
+                                {/* Background frame image */}
+                                <img
+                                  src={`${(import.meta as any).env.BASE_URL || "/"}images/skilltree/${nodeBgFrame}`}
+                                  className={`absolute inset-0 w-full h-full object-contain pointer-events-none transition-all duration-300 ${nodeGlowClass} ${isActive ? "" : isUnlockable ? "group-hover/node:brightness-110" : "opacity-65"}`}
+                                  alt="node-bg"
+                                />
+                                {/* Skill Icon */}
+                                <img
+                                  src={`${(import.meta as any).env.BASE_URL || "/"}images/skilltree/${node.icon}.png`}
+                                  className={`relative z-10 w-[62%] h-[62%] object-contain pointer-events-none transition-all duration-300 ${isActive ? "" : isUnlockable ? "grayscale-0 opacity-85 group-hover/node:opacity-100 group-hover/node:scale-105" : "grayscale opacity-50 brightness-75"}`}
+                                  alt={node.title_zh}
+                                />
+                              </button>
+
+                              {/* Skill Node Tooltip */}
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-stone-900 border border-stone-850 rounded-lg p-2.5 shadow-xl opacity-0 scale-95 pointer-events-none group-hover/node:opacity-100 group-hover/node:scale-100 transition-all duration-200 z-50 text-stone-300 text-xs space-y-1.5 font-sans">
+                                <div className="flex justify-between items-start">
+                                  <span className="font-bold text-white">{node.title_zh}</span>
+                                  {isActive && (
+                                    <span className="text-[9px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-serif font-bold shrink-0">
+                                      已啟動
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-stone-500 font-mono">{node.title_en}</div>
+                                <hr className="border-stone-850" />
+                                <p className="text-[10px] text-stone-400 leading-normal">
+                                  {node.desc_zh}
+                                </p>
+                                <hr className="border-stone-850" />
+                                <div className="flex items-center justify-between text-[9px] text-stone-500">
+                                  <span>分組: {
+                                    node.group === "circuitry" ? "電路插槽" :
+                                      node.group === "chassis" ? "機體備用" :
+                                        node.group === "drones" ? "無人機系統" : "陣營信仰"
+                                  }</span>
+                                  {isActive ? (
+                                    <span className="text-amber-500 font-bold">點擊退還點數</span>
+                                  ) : isUnlockable ? (
+                                    <span className="text-emerald-500 font-bold">點擊啟動 (消耗1點)</span>
+                                  ) : (
+                                    <span className="text-rose-500">前置鎖定/點數不足</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Top Block: Real-time Stats & Favorite Food */}
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-6 relative z-10 mb-6 font-sans">
@@ -2375,107 +3007,170 @@ export default function App() {
                       <div className="mt-4 flex flex-wrap gap-2">
                         {/* Speed */}
                         {calculatedStats.speedBonus > 0 && (
-                          <span className="text-[11px] px-2 py-1 rounded-md border bg-amber-900/60 text-amber-300 border-amber-500/30 font-medium flex items-center gap-1 animate-dst-glow">
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-amber-900/60 text-amber-300 border-amber-500/30 font-medium flex items-center gap-1">
                             <Zap className="h-3 w-3 shrink-0" />
                             移動速度: +{calculatedStats.speedBonus}%
                           </span>
                         )}
                         {/* Light */}
                         {calculatedStats.light && (
-                          <span className="text-[11px] px-2 py-1 rounded-md border bg-yellow-950/40 text-yellow-300 border-yellow-500/30 font-medium flex items-center gap-1 animate-dst-glow">
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-yellow-950/40 text-yellow-300 border-yellow-500/30 font-medium flex items-center gap-1">
                             <Lightbulb className="h-3 w-3 shrink-0" />
                             隨身光源: 已啟用
                           </span>
                         )}
                         {/* Warmth */}
                         {calculatedStats.thermal && (
-                          <span className="text-[11px] px-2 py-1 rounded-md border bg-orange-950/60 text-orange-300 border-orange-500/30 font-medium flex items-center gap-1 animate-dst-glow">
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-orange-950/60 text-orange-300 border-orange-500/30 font-medium flex items-center gap-1">
                             <Flame className="h-3 w-3 shrink-0" />
                             體溫調溫: 熱源 (防寒)
                           </span>
                         )}
                         {/* Cool */}
                         {calculatedStats.refrigerant && (
-                          <span className="text-[11px] px-2 py-1 rounded-md border bg-sky-950/60 text-sky-300 border-sky-500/30 font-medium flex items-center gap-1 animate-dst-glow">
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-sky-950/60 text-sky-300 border-sky-500/30 font-medium flex items-center gap-1">
                             <Sparkles className="h-3 w-3 shrink-0" />
                             體溫調溫: 冷源 (散熱)
                           </span>
                         )}
                         {/* Sanity Regen */}
                         {calculatedStats.sanityRegen > 0 && (
-                          <span className="text-[11px] px-2 py-1 rounded-md border bg-cyan-950/40 text-cyan-300 border-cyan-500/30 font-medium flex items-center gap-1 animate-dst-glow">
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-cyan-950/40 text-cyan-300 border-cyan-500/30 font-medium flex items-center gap-1">
                             <Eye className="h-3 w-3 shrink-0" />
                             理智回復: +{calculatedStats.sanityRegen}/分
                           </span>
                         )}
                         {/* Health Regen */}
                         {calculatedStats.healthRegen > 0 && (
-                          <span className="text-[11px] px-2 py-1 rounded-md border bg-rose-950/40 text-rose-300 border-rose-500/30 font-medium flex items-center gap-1 animate-dst-glow">
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-rose-950/40 text-rose-300 border-rose-500/30 font-medium flex items-center gap-1">
                             <Heart className="h-3 w-3 shrink-0" />
                             生命回復: +{calculatedStats.healthRegen}/分
                           </span>
                         )}
                         {/* Hunger rate reduction */}
                         {calculatedStats.hungerRateText !== "" && (
-                          <span className="text-[11px] px-2 py-1 rounded-md border bg-emerald-950/40 text-emerald-300 border-emerald-500/30 font-medium flex items-center gap-1 animate-dst-glow">
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-emerald-950/40 text-emerald-300 border-emerald-500/30 font-medium flex items-center gap-1">
                             <Soup className="h-3 w-3 shrink-0" />
                             飢餓減緩: {calculatedStats.hungerRateText}
                           </span>
                         )}
                         {/* Damage Reduction */}
                         {calculatedStats.physicalReduction !== "" && (
-                          <span className="text-[11px] px-2 py-1 rounded-md border bg-rose-950/40 text-rose-300 border-rose-500/30 font-medium flex items-center gap-1 animate-dst-glow">
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-rose-950/40 text-rose-300 border-rose-500/30 font-medium flex items-center gap-1">
                             <Layers className="h-3 w-3 shrink-0" />
                             物理減免: {calculatedStats.physicalReduction}
                           </span>
                         )}
                         {/* Electric retaliate */}
                         {calculatedStats.hasElectric && (
-                          <span className="text-[11px] px-2 py-1 rounded-md border bg-amber-900/40 text-yellow-400 border-amber-500/30 font-medium flex items-center gap-1 animate-dst-glow">
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-amber-900/40 text-yellow-400 border-amber-500/30 font-medium flex items-center gap-1">
                             <Zap className="h-3 w-3 shrink-0 text-yellow-400" />
                             電氣化: 20點帶電反傷
                           </span>
                         )}
                         {/* Pocket expansion */}
                         {calculatedStats.pocketCount > 0 && (
-                          <span className="text-[11px] px-2 py-1 rounded-md border bg-stone-900 border-stone-700 text-stone-300 font-medium flex items-center gap-1 animate-dst-glow">
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-stone-900 border-stone-700 text-stone-300 font-medium flex items-center gap-1">
                             <Compass className="h-3 w-3 shrink-0" />
                             空間擴展: {calculatedStats.pocketCount}個擴展物品欄
                           </span>
                         )}
                         {/* Redigest */}
                         {calculatedStats.hasDigest && (
-                          <span className="text-[11px] px-2 py-1 rounded-md border bg-emerald-950/20 text-emerald-300 border-emerald-500/30 font-medium flex items-center gap-1 animate-dst-glow">
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-emerald-950/20 text-emerald-300 border-emerald-500/30 font-medium flex items-center gap-1">
                             <Soup className="h-3 w-3 shrink-0" />
                             再消化: 可食變質物產營養磚
                           </span>
                         )}
                         {/* Chess count */}
                         {calculatedStats.chessBonus > 0 && (
-                          <span className="text-[11px] px-2 py-1 rounded-md border bg-indigo-950/40 text-indigo-300 border-indigo-500/30 font-medium flex items-center gap-1 animate-dst-glow">
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-indigo-950/40 text-indigo-300 border-indigo-500/30 font-medium flex items-center gap-1">
                             <UserCheck className="h-3 w-3 shrink-0" />
                             棋聖: 發條上限 +{calculatedStats.chessBonus}
                           </span>
                         )}
                         {/* Parrying block */}
                         {calculatedStats.hasBlock && (
-                          <span className="text-[11px] px-2 py-1 rounded-md border bg-stone-950 text-stone-200 border-stone-605 font-medium flex items-center gap-1 animate-dst-glow">
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-stone-950 text-stone-200 border-stone-605 font-medium flex items-center gap-1">
                             <Layers className="h-3 w-3 shrink-0" />
                             格擋: 80%防禦並持續嘲諷
                           </span>
                         )}
                         {/* Sonic fear */}
                         {calculatedStats.hasSonic && (
-                          <span className="text-[11px] px-2 py-1 rounded-md border bg-rose-950/40 text-rose-355 border-rose-500/30 font-medium flex items-center gap-1 animate-dst-glow">
-                            <Sparkles className="h-3 w-3 shrink-0" />
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-rose-950/40 text-rose-300 border-rose-500/30 font-medium flex items-center gap-1">
+                            <Sparkles className="h-3 w-3 shrink-0 text-rose-400" />
                             聲波激發: 驚醒/恐懼周圍生物
                           </span>
                         )}
                         {/* Spin harvesting */}
                         {calculatedStats.hasSpin && (
-                          <span className="text-[11px] px-2 py-1 rounded-md border bg-amber-900/40 text-amber-200 border-amber-500/30 font-medium flex items-center gap-1 animate-dst-glow">
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-amber-900/40 text-amber-200 border-amber-500/30 font-medium flex items-center gap-1">
                             <RotateCcw className="h-3 w-3 shrink-0 animate-spin" />
                             旋轉週期: 工作/攻擊旋轉收割
+                          </span>
+                        )}
+                        {/* Backup Chassis Limit */}
+                        {calculatedStats.backupChassisLimit > 0 && (
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-amber-900/20 text-amber-300 border-amber-500/20 font-medium flex items-center gap-1">
+                            <Cpu className="h-3 w-3 shrink-0 text-amber-400" />
+                            冷啟動: 備用機體上限 {calculatedStats.backupChassisLimit} 個
+                          </span>
+                        )}
+                        {/* Warm Standby */}
+                        {calculatedStats.hasWarmStandby && (
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-amber-900/25 text-amber-200 border-amber-500/30 font-medium flex items-center gap-1">
+                            <Zap className="h-3 w-3 shrink-0 text-amber-400" />
+                            熱啟動: 備用機體電路保持運作
+                          </span>
+                        )}
+                        {/* Remote Transfer */}
+                        {calculatedStats.hasRemoteTransfer && (
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-amber-900/40 text-amber-200 border-amber-500/30 font-medium flex items-center gap-1">
+                            <Compass className="h-3 w-3 shrink-0 text-amber-400" />
+                            意識傳輸: 可遠端傳輸意識
+                          </span>
+                        )}
+                        {/* Drones */}
+                        {calculatedStats.hasScoutDrone && (
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-stone-900 border-stone-800 text-stone-300 font-medium flex items-center gap-1">
+                            <Cpu className="h-3 w-3 shrink-0 text-stone-500" />
+                            探路無人機 (Scott) 可製作
+                          </span>
+                        )}
+                        {/* Delivery Drone */}
+                        {calculatedStats.hasDeliveryDrone && (
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-stone-900 border-stone-800 text-stone-300 font-medium flex items-center gap-1">
+                            <Cpu className="h-3 w-3 shrink-0 text-stone-500" />
+                            運輸無人機 (Drew) 可製作
+                          </span>
+                        )}
+                        {/* Zap Drone */}
+                        {calculatedStats.hasZapDrone && (
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-stone-900 border-stone-800 text-stone-300 font-medium flex items-center gap-1">
+                            <Cpu className="h-3 w-3 shrink-0 text-stone-500" />
+                            電擊無人機 (Jules) 可製作
+                          </span>
+                        )}
+                        {/* Signal Booster */}
+                        {calculatedStats.hasSignalBooster && (
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-amber-900/40 text-amber-200 border-amber-500/30 font-medium flex items-center gap-1">
+                            <Sparkles className="h-3 w-3 shrink-0 text-amber-400" />
+                            信號放大: 探測與作戰範圍提升
+                          </span>
+                        )}
+                        {/* Lunar Vessel */}
+                        {calculatedStats.hasLunarVessel && (
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-emerald-950/40 text-emerald-300 border-emerald-500/30 font-medium flex items-center gap-1">
+                            <Sparkles className="h-3 w-3 shrink-0 text-emerald-400" />
+                            信仰親和: 亮白容器 (天體屬性)
+                          </span>
+                        )}
+                        {/* Shadow Servitor */}
+                        {calculatedStats.hasShadowServitor && (
+                          <span className="text-[11px] px-2 py-1 rounded-md border bg-purple-950/40 text-purple-300 border-purple-500/30 font-medium flex items-center gap-1">
+                            <Eye className="h-3 w-3 shrink-0 text-purple-400" />
+                            信仰親和: 暗影伺服 (暗影屬性)
                           </span>
                         )}
                         {/* Empty placeholder */}
@@ -2493,9 +3188,18 @@ export default function App() {
                           calculatedStats.chessBonus === 0 &&
                           !calculatedStats.hasBlock &&
                           !calculatedStats.hasSonic &&
-                          !calculatedStats.hasSpin && (
-                            <span className="text-[11px] px-2 py-1 rounded-md border bg-stone-950/20 text-stone-500 border-stone-850">
-                              無特殊加成狀態 (無晶片裝載)
+                          !calculatedStats.hasSpin &&
+                          calculatedStats.backupChassisLimit === 0 &&
+                          !calculatedStats.hasWarmStandby &&
+                          !calculatedStats.hasRemoteTransfer &&
+                          !calculatedStats.hasScoutDrone &&
+                          !calculatedStats.hasDeliveryDrone &&
+                          !calculatedStats.hasZapDrone &&
+                          !calculatedStats.hasSignalBooster &&
+                          !calculatedStats.hasLunarVessel &&
+                          !calculatedStats.hasShadowServitor && (
+                            <span className="text-[11px] px-2 py-1 rounded-md border bg-stone-950/20 text-stone-500 border-stone-850 font-medium">
+                              無特殊加成狀態 (無晶片裝載與天賦啟用)
                             </span>
                           )}
                       </div>
@@ -2531,6 +3235,54 @@ export default function App() {
                       電路板升級系統 (Circuit Upgrade System)
                     </h3>
 
+                    {/* Quick Preset Buttons */}
+                    <div className="mb-4 flex flex-wrap gap-2 items-center bg-stone-900 border border-stone-800 rounded-xl p-3">
+                      <span className="text-xs text-stone-400 font-bold font-serif flex items-center gap-1 shrink-0">
+                        <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                        一鍵裝載預設：
+                      </span>
+                      <button
+                        onClick={() => setWxCircuits([
+                          "alpha_health_2", "alpha_hunger_2", "alpha_sanity_2",
+                          "beta_speed_2", "beta_nightvision", "beta_range",
+                          "gamma_chess"
+                        ])}
+                        className="px-3 py-1.5 text-xs bg-stone-850 hover:bg-stone-800 border border-stone-700 hover:border-amber-500/50 rounded-lg text-amber-300 transition cursor-pointer font-bold"
+                      >
+                        前期下地 🎒
+                      </button>
+                      <button
+                        onClick={() => setWxCircuits([
+                          "alpha_health_2", "alpha_combo_1", "alpha_hunger_2",
+                          "beta_speed_2", "beta_speed_2", "beta_electric", "beta_light_2",
+                          "gamma_chess", "gamma_spin", "gamma_spin"
+                        ])}
+                        className="px-3 py-1.5 text-xs bg-stone-850 hover:bg-stone-800 border border-stone-700 hover:border-amber-500/50 rounded-lg text-amber-300 transition cursor-pointer font-bold"
+                      >
+                        常用萬金油 🌟
+                      </button>
+                      <button
+                        onClick={() => setWxCircuits([
+                          "alpha_health_2", "alpha_combo_1", "alpha_hunger_2",
+                          "beta_speed_2", "beta_speed_2", "beta_thermal",
+                          "gamma_chess", "gamma_spin", "gamma_spin"
+                        ])}
+                        className="px-3 py-1.5 text-xs bg-stone-850 hover:bg-stone-800 border border-stone-700 hover:border-amber-500/50 rounded-lg text-amber-300 transition cursor-pointer font-bold"
+                      >
+                        冬季 ❄️
+                      </button>
+                      <button
+                        onClick={() => setWxCircuits([
+                          "alpha_health_2", "alpha_combo_1", "alpha_hunger_2",
+                          "beta_speed_2", "beta_speed_2", "beta_refrigerant",
+                          "gamma_chess", "gamma_spin", "gamma_spin"
+                        ])}
+                        className="px-3 py-1.5 text-xs bg-stone-850 hover:bg-stone-800 border border-stone-700 hover:border-amber-500/50 rounded-lg text-amber-300 transition cursor-pointer font-bold"
+                      >
+                        夏季 ☀️
+                      </button>
+                    </div>
+
                     {/* Equipped Circuits List / Log */}
                     <div className="bg-stone-950 border border-stone-850 rounded-xl p-3 min-h-[80px] flex flex-col justify-center mb-6">
                       {wxCircuits.length === 0 ? (
@@ -2562,7 +3314,7 @@ export default function App() {
                               return (
                                 <div
                                   key={`${cId}-${idx}`}
-                                  className="inline-flex items-center gap-1.5 bg-stone-900 border border-stone-800 rounded px-2 py-0.5 text-xs text-stone-300 animate-dst-glow"
+                                  className="inline-flex items-center gap-1.5 bg-stone-900 border border-stone-800 rounded px-2 py-0.5 text-xs text-stone-300"
                                 >
                                   <CircuitImage circuitId={cId} className="w-4 h-4 object-contain shrink-0" />
                                   <span>{circ.name}</span>
@@ -2595,39 +3347,46 @@ export default function App() {
                               🟥 阿爾法插槽 (Alpha Slots)
                             </span>
                             <span className="font-mono text-stone-400 font-bold">
-                              {totalSlotsUsed.alpha} / 6
+                              {totalSlotsUsed.alpha} / {maxSlots}
                             </span>
                           </div>
-                          <div className="grid grid-cols-6 gap-2">
-                            {slotsAllocation.alpha.map((slot, index) => {
-                              if (slot.empty) {
-                                return (
-                                  <div
-                                    key={`empty-alpha-${index}`}
-                                    className="aspect-square rounded-xl border border-dashed border-rose-900/20 bg-stone-950/60 flex items-center justify-center text-[10px] text-stone-700 font-mono select-none"
-                                    title={`阿爾法插槽 ${index + 1} (空)`}
-                                  >
-                                    α-{index + 1}
-                                  </div>
-                                );
-                              } else {
-                                return (
-                                  <button
-                                    key={`filled-alpha-${index}`}
-                                    onClick={() =>
-                                      handleUninstallCircuit(slot.originalIndex)
-                                    }
-                                    className={`aspect-square rounded-xl border p-1 flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer hover:brightness-125 hover:scale-105 active:scale-95 ${slot.color}`}
-                                    title={`${slot.name} (佔用插槽 ${index + 1}/6) - 點擊解除安裝`}
-                                  >
-                                    <CircuitImage circuitId={slot.circuitId} className="w-7 h-7 object-contain" />
-                                    <span className="text-[8px] font-mono font-bold leading-none opacity-80">
-                                      {slot.indexInCircuit + 1}/{slot.slots}
-                                    </span>
-                                  </button>
-                                );
-                              }
-                            })}
+                          <div className={`grid gap-2 ${maxSlots === 7 ? "grid-cols-7" : "grid-cols-6"}`}>
+                            {(() => {
+                              let currentSlotNum = 1;
+                              return slotsAllocation.alpha.map((slot, index) => {
+                                if (slot.empty) {
+                                  const displayNum = currentSlotNum;
+                                  currentSlotNum += 1;
+                                  return (
+                                    <div
+                                      key={`empty-alpha-${index}`}
+                                      className="w-full h-10 md:h-12 rounded-xl border border-dashed border-rose-900/20 bg-stone-950/60 flex items-center justify-center text-[10px] text-stone-700 font-mono select-none"
+                                      title={`阿爾法插槽 ${displayNum} (空)`}
+                                    >
+                                      α-{displayNum}
+                                    </div>
+                                  );
+                                } else {
+                                  const startSlot = currentSlotNum;
+                                  currentSlotNum += slot.slots!;
+                                  const endSlot = currentSlotNum - 1;
+                                  const slotRangeStr = startSlot === endSlot ? `${startSlot}` : `${startSlot}-${endSlot}`;
+                                  return (
+                                    <button
+                                      key={`filled-alpha-${index}`}
+                                      onClick={() =>
+                                        handleUninstallCircuit(slot.originalIndex!)
+                                      }
+                                      style={{ gridColumn: `span ${slot.slots}` }}
+                                      className={`h-10 md:h-12 rounded-xl border p-1 flex items-center justify-center gap-1 transition-all cursor-pointer hover:brightness-125 hover:scale-105 active:scale-95 ${slot.color}`}
+                                      title={`${slot.name} (佔用插槽 ${slotRangeStr}/${maxSlots}) - 點擊解除安裝`}
+                                    >
+                                      <CircuitImage circuitId={slot.circuitId!} className="w-7 h-7 object-contain" />
+                                    </button>
+                                  );
+                                }
+                              });
+                            })()}
                           </div>
                         </div>
 
@@ -2650,7 +3409,7 @@ export default function App() {
                                 const isLimitReached =
                                   currentCount >= circuit.maxCount;
                                 const isSlotsExceeded =
-                                  totalSlotsUsed.alpha + circuit.slots > 6;
+                                  totalSlotsUsed.alpha + circuit.slots > maxSlots;
                                 const canEquip =
                                   !isLimitReached && !isSlotsExceeded;
 
@@ -2678,11 +3437,10 @@ export default function App() {
                                     >
                                       <div className="flex items-center gap-2 min-w-0 flex-1">
                                         <ChevronRight
-                                          className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 text-stone-500 ${
-                                            isExpanded
-                                              ? "rotate-90 text-rose-400"
-                                              : ""
-                                          }`}
+                                          className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 text-stone-500 ${isExpanded
+                                            ? "rotate-90 text-rose-400"
+                                            : ""
+                                            }`}
                                         />
                                         <CircuitImage circuitId={circuit.id} className="w-6 h-6 object-contain shrink-0" />
                                         <div className="min-w-0 flex-1">
@@ -2710,13 +3468,12 @@ export default function App() {
                                           e.stopPropagation();
                                           handleInstallCircuit(circuit);
                                         }}
-                                        className={`shrink-0 text-[9px] px-2 py-1 rounded transition font-bold font-serif shadow-sm ml-2 ${
-                                          isLimitReached
+                                        className={`shrink-0 text-[9px] px-2 py-1 rounded transition font-bold font-serif shadow-sm ml-2 ${isLimitReached
+                                          ? "text-stone-600 bg-stone-900 border border-stone-850 cursor-not-allowed"
+                                          : isSlotsExceeded
                                             ? "text-stone-600 bg-stone-900 border border-stone-850 cursor-not-allowed"
-                                            : isSlotsExceeded
-                                              ? "text-stone-600 bg-stone-900 border border-stone-850 cursor-not-allowed"
-                                              : "text-rose-400 border border-rose-500/30 bg-rose-500/5 hover:bg-rose-600 hover:text-stone-950 cursor-pointer"
-                                        }`}
+                                            : "text-rose-400 border border-rose-500/30 bg-rose-500/5 hover:bg-rose-600 hover:text-stone-950 cursor-pointer"
+                                          }`}
                                       >
                                         {isLimitReached
                                           ? "已達上限"
@@ -2790,39 +3547,46 @@ export default function App() {
                               🟨 貝塔插槽 (Beta Slots)
                             </span>
                             <span className="font-mono text-stone-400 font-bold">
-                              {totalSlotsUsed.beta} / 6
+                              {totalSlotsUsed.beta} / {maxSlots}
                             </span>
                           </div>
-                          <div className="grid grid-cols-6 gap-2">
-                            {slotsAllocation.beta.map((slot, index) => {
-                              if (slot.empty) {
-                                return (
-                                  <div
-                                    key={`empty-beta-${index}`}
-                                    className="aspect-square rounded-xl border border-dashed border-amber-900/20 bg-stone-950/60 flex items-center justify-center text-[10px] text-stone-700 font-mono select-none"
-                                    title={`貝塔插槽 ${index + 1} (空)`}
-                                  >
-                                    β-{index + 1}
-                                  </div>
-                                );
-                              } else {
-                                return (
-                                  <button
-                                    key={`filled-beta-${index}`}
-                                    onClick={() =>
-                                      handleUninstallCircuit(slot.originalIndex)
-                                    }
-                                    className={`aspect-square rounded-xl border p-1 flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer hover:brightness-125 hover:scale-105 active:scale-95 ${slot.color}`}
-                                    title={`${slot.name} (佔用插槽 ${index + 1}/6) - 點擊解除安裝`}
-                                  >
-                                    <CircuitImage circuitId={slot.circuitId} className="w-7 h-7 object-contain" />
-                                    <span className="text-[8px] font-mono font-bold leading-none opacity-80">
-                                      {slot.indexInCircuit + 1}/{slot.slots}
-                                    </span>
-                                  </button>
-                                );
-                              }
-                            })}
+                          <div className={`grid gap-2 ${maxSlots === 7 ? "grid-cols-7" : "grid-cols-6"}`}>
+                            {(() => {
+                              let currentSlotNum = 1;
+                              return slotsAllocation.beta.map((slot, index) => {
+                                if (slot.empty) {
+                                  const displayNum = currentSlotNum;
+                                  currentSlotNum += 1;
+                                  return (
+                                    <div
+                                      key={`empty-beta-${index}`}
+                                      className="w-full h-10 md:h-12 rounded-xl border border-dashed border-amber-900/20 bg-stone-950/60 flex items-center justify-center text-[10px] text-stone-700 font-mono select-none"
+                                      title={`貝塔插槽 ${displayNum} (空)`}
+                                    >
+                                      β-{displayNum}
+                                    </div>
+                                  );
+                                } else {
+                                  const startSlot = currentSlotNum;
+                                  currentSlotNum += slot.slots!;
+                                  const endSlot = currentSlotNum - 1;
+                                  const slotRangeStr = startSlot === endSlot ? `${startSlot}` : `${startSlot}-${endSlot}`;
+                                  return (
+                                    <button
+                                      key={`filled-beta-${index}`}
+                                      onClick={() =>
+                                        handleUninstallCircuit(slot.originalIndex!)
+                                      }
+                                      style={{ gridColumn: `span ${slot.slots}` }}
+                                      className={`h-10 md:h-12 rounded-xl border p-1 flex items-center justify-center gap-1 transition-all cursor-pointer hover:brightness-125 hover:scale-105 active:scale-95 ${slot.color}`}
+                                      title={`${slot.name} (佔用插槽 ${slotRangeStr}/${maxSlots}) - 點擊解除安裝`}
+                                    >
+                                      <CircuitImage circuitId={slot.circuitId!} className="w-7 h-7 object-contain" />
+                                    </button>
+                                  );
+                                }
+                              });
+                            })()}
                           </div>
                         </div>
 
@@ -2845,7 +3609,7 @@ export default function App() {
                                 const isLimitReached =
                                   currentCount >= circuit.maxCount;
                                 const isSlotsExceeded =
-                                  totalSlotsUsed.beta + circuit.slots > 6;
+                                  totalSlotsUsed.beta + circuit.slots > maxSlots;
                                 const canEquip =
                                   !isLimitReached && !isSlotsExceeded;
 
@@ -2873,11 +3637,10 @@ export default function App() {
                                     >
                                       <div className="flex items-center gap-2 min-w-0 flex-1">
                                         <ChevronRight
-                                          className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 text-stone-500 ${
-                                            isExpanded
-                                              ? "rotate-90 text-amber-400"
-                                              : ""
-                                          }`}
+                                          className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 text-stone-500 ${isExpanded
+                                            ? "rotate-90 text-amber-400"
+                                            : ""
+                                            }`}
                                         />
                                         <CircuitImage circuitId={circuit.id} className="w-6 h-6 object-contain shrink-0" />
                                         <div className="min-w-0 flex-1">
@@ -2905,13 +3668,12 @@ export default function App() {
                                           e.stopPropagation();
                                           handleInstallCircuit(circuit);
                                         }}
-                                        className={`shrink-0 text-[9px] px-2 py-1 rounded transition font-bold font-serif shadow-sm ml-2 ${
-                                          isLimitReached
+                                        className={`shrink-0 text-[9px] px-2 py-1 rounded transition font-bold font-serif shadow-sm ml-2 ${isLimitReached
+                                          ? "text-stone-600 bg-stone-900 border border-stone-850 cursor-not-allowed"
+                                          : isSlotsExceeded
                                             ? "text-stone-600 bg-stone-900 border border-stone-850 cursor-not-allowed"
-                                            : isSlotsExceeded
-                                              ? "text-stone-600 bg-stone-900 border border-stone-850 cursor-not-allowed"
-                                              : "text-amber-400 border border-amber-500/30 bg-amber-500/5 hover:bg-amber-600 hover:text-stone-950 cursor-pointer"
-                                        }`}
+                                            : "text-amber-400 border border-amber-500/30 bg-amber-500/5 hover:bg-amber-600 hover:text-stone-950 cursor-pointer"
+                                          }`}
                                       >
                                         {isLimitReached
                                           ? "已達上限"
@@ -2985,39 +3747,46 @@ export default function App() {
                               🟩 伽馬插槽 (Gamma Slots)
                             </span>
                             <span className="font-mono text-stone-400 font-bold">
-                              {totalSlotsUsed.gamma} / 6
+                              {totalSlotsUsed.gamma} / {maxSlots}
                             </span>
                           </div>
-                          <div className="grid grid-cols-6 gap-2">
-                            {slotsAllocation.gamma.map((slot, index) => {
-                              if (slot.empty) {
-                                return (
-                                  <div
-                                    key={`empty-gamma-${index}`}
-                                    className="aspect-square rounded-xl border border-dashed border-emerald-900/20 bg-stone-950/60 flex items-center justify-center text-[10px] text-stone-700 font-mono select-none"
-                                    title={`伽馬插槽 ${index + 1} (空)`}
-                                  >
-                                    γ-{index + 1}
-                                  </div>
-                                );
-                              } else {
-                                return (
-                                  <button
-                                    key={`filled-gamma-${index}`}
-                                    onClick={() =>
-                                      handleUninstallCircuit(slot.originalIndex)
-                                    }
-                                    className={`aspect-square rounded-xl border p-1 flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer hover:brightness-125 hover:scale-105 active:scale-95 ${slot.color}`}
-                                    title={`${slot.name} (佔用插槽 ${index + 1}/6) - 點擊解除安裝`}
-                                  >
-                                    <CircuitImage circuitId={slot.circuitId} className="w-7 h-7 object-contain" />
-                                    <span className="text-[8px] font-mono font-bold leading-none opacity-80">
-                                      {slot.indexInCircuit + 1}/{slot.slots}
-                                    </span>
-                                  </button>
-                                );
-                              }
-                            })}
+                          <div className={`grid gap-2 ${maxSlots === 7 ? "grid-cols-7" : "grid-cols-6"}`}>
+                            {(() => {
+                              let currentSlotNum = 1;
+                              return slotsAllocation.gamma.map((slot, index) => {
+                                if (slot.empty) {
+                                  const displayNum = currentSlotNum;
+                                  currentSlotNum += 1;
+                                  return (
+                                    <div
+                                      key={`empty-gamma-${index}`}
+                                      className="w-full h-10 md:h-12 rounded-xl border border-dashed border-emerald-900/20 bg-stone-950/60 flex items-center justify-center text-[10px] text-stone-700 font-mono select-none"
+                                      title={`伽馬插槽 ${displayNum} (空)`}
+                                    >
+                                      γ-{displayNum}
+                                    </div>
+                                  );
+                                } else {
+                                  const startSlot = currentSlotNum;
+                                  currentSlotNum += slot.slots!;
+                                  const endSlot = currentSlotNum - 1;
+                                  const slotRangeStr = startSlot === endSlot ? `${startSlot}` : `${startSlot}-${endSlot}`;
+                                  return (
+                                    <button
+                                      key={`filled-gamma-${index}`}
+                                      onClick={() =>
+                                        handleUninstallCircuit(slot.originalIndex!)
+                                      }
+                                      style={{ gridColumn: `span ${slot.slots}` }}
+                                      className={`h-10 md:h-12 rounded-xl border p-1 flex items-center justify-center gap-1 transition-all cursor-pointer hover:brightness-125 hover:scale-105 active:scale-95 ${slot.color}`}
+                                      title={`${slot.name} (佔用插槽 ${slotRangeStr}/${maxSlots}) - 點擊解除安裝`}
+                                    >
+                                      <CircuitImage circuitId={slot.circuitId!} className="w-7 h-7 object-contain" />
+                                    </button>
+                                  );
+                                }
+                              });
+                            })()}
                           </div>
                         </div>
 
@@ -3040,7 +3809,7 @@ export default function App() {
                                 const isLimitReached =
                                   currentCount >= circuit.maxCount;
                                 const isSlotsExceeded =
-                                  totalSlotsUsed.gamma + circuit.slots > 6;
+                                  totalSlotsUsed.gamma + circuit.slots > maxSlots;
                                 const canEquip =
                                   !isLimitReached && !isSlotsExceeded;
 
@@ -3068,11 +3837,10 @@ export default function App() {
                                     >
                                       <div className="flex items-center gap-2 min-w-0 flex-1">
                                         <ChevronRight
-                                          className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 text-stone-500 ${
-                                            isExpanded
-                                              ? "rotate-90 text-emerald-400"
-                                              : ""
-                                          }`}
+                                          className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 text-stone-500 ${isExpanded
+                                            ? "rotate-90 text-emerald-400"
+                                            : ""
+                                            }`}
                                         />
                                         <CircuitImage circuitId={circuit.id} className="w-6 h-6 object-contain shrink-0" />
                                         <div className="min-w-0 flex-1">
@@ -3100,13 +3868,12 @@ export default function App() {
                                           e.stopPropagation();
                                           handleInstallCircuit(circuit);
                                         }}
-                                        className={`shrink-0 text-[9px] px-2 py-1 rounded transition font-bold font-serif shadow-sm ml-2 ${
-                                          isLimitReached
+                                        className={`shrink-0 text-[9px] px-2 py-1 rounded transition font-bold font-serif shadow-sm ml-2 ${isLimitReached
+                                          ? "text-stone-600 bg-stone-900 border border-stone-850 cursor-not-allowed"
+                                          : isSlotsExceeded
                                             ? "text-stone-600 bg-stone-900 border border-stone-850 cursor-not-allowed"
-                                            : isSlotsExceeded
-                                              ? "text-stone-600 bg-stone-900 border border-stone-850 cursor-not-allowed"
-                                              : "text-emerald-400 border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-600 hover:text-stone-950 cursor-pointer"
-                                        }`}
+                                            : "text-emerald-400 border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-600 hover:text-stone-950 cursor-pointer"
+                                          }`}
                                       >
                                         {isLimitReached
                                           ? "已達上限"
